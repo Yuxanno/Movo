@@ -1,0 +1,87 @@
+name: financeflow
+description: Premium financial management app with multi-account support, voice input, and analytics.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.0 <4.0.0'
+  flutter: '>=3.19.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State Management
+  riverpod: ^2.4.0
+  flutter_riverpod: ^2.4.0
+  hooks_riverpod: ^2.4.0
+
+  # Serialization & Models
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.8.1
+  json_serializable: ^6.7.1
+
+  # Database
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  firebase_core: ^2.24.0
+  cloud_firestore: ^4.14.0
+  firebase_auth: ^4.15.0
+
+  # UI & Design
+  google_fonts: ^6.1.0
+  flutter_screenutil: ^5.9.0
+  cached_network_image: ^3.3.0
+  smooth_page_indicator: ^1.1.0
+
+  # Charts & Analytics
+  fl_chart: ^0.65.0
+
+  # Localization
+  easy_localization: ^3.0.2
+
+  # Currency & Formatting
+  intl: ^0.19.0
+
+  # Utils
+  uuid: ^4.0.0
+  shared_preferences: ^2.2.2
+  dio: ^5.3.1
+
+  # Logging
+  logger: ^2.0.2+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.0
+  build_runner: ^2.4.6
+  freezed: ^2.4.1
+  json_serializable: ^6.7.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/l10n/
+    - assets/images/
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
