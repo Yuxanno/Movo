@@ -2,27 +2,63 @@ import { NextResponse } from "next/server"
 
 export async function POST(req: Request) {
   try {
-    const { image } = await req.json()
-    if (!image) return NextResponse.json({ error: "No image" }, { status: 400 })
+    let base64Image = ""
+    let mimeType = "image/jpeg"
 
-    const apiKey = process.env.GROQ_API
-    if (!apiKey) return NextResponse.json({ error: "GROQ_API key not set" }, { status: 500 })
-
-    // Compress: if base64 is too large (>3MB raw), reject early
-    const base64Data = image.split(",")[1] ?? image
-    const sizeBytes = Math.ceil(base64Data.length * 0.75)
-    if (sizeBytes > 3.5 * 1024 * 1024) {
-      return NextResponse.json({ error: "Изображение слишком большое. Используйте фото меньшего размера." }, { status: 413 })
+    // Check content type to decide how to parse
+    const contentType = req.headers.get("content-type") || ""
+    
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData()
+      const file = formData.get("file") as File | null
+      if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 })
+      
+      const bytes = await file.arrayBuffer()
+      const buffer = Buffer.from(bytes)
+      base64Image = buffer.toString("base64")
+      mimeType = file.type || "image/jpeg"
+    } else {
+      const { image } = await req.json()
+      if (!image) return NextResponse.json({ error: "No image provided" }, { status: 400 })
+      // Handle data:image/jpeg;base64,...
+      const match = image.match(/^data:([^;]+);base64,(.+)$/)
+      if (match) {
+        mimeType = match[1]
+        base64Image = match[2]
+      } else {
+        base64Image = image
+      }
     }
 
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const xaiKey = process.env.XAI_API_KEY
+    const groqKey = process.env.GROQ_API
+
+    let apiUrl = ""
+    let apiKey = ""
+    let model = ""
+
+    if (xaiKey) {
+      apiUrl = "https://api.x.ai/v1/chat/completions"
+      apiKey = xaiKey
+      model = "grok-vision-beta" // or grok-2-vision-1212
+    } else if (groqKey) {
+      apiUrl = "https://api.groq.com/openai/v1/chat/completions"
+      apiKey = groqKey
+      model = "llama-3.2-11b-vision-preview"
+    } else {
+      return NextResponse.json({ error: "No vision API key configured (XAI_API_KEY or GROQ_API)" }, { status: 500 })
+    }
+
+    const dataUrl = `data:${mimeType};base64,${base64Image}`
+
+    const res = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
+        model,
         response_format: { type: "json_object" },
         messages: [
           {
@@ -30,19 +66,25 @@ export async function POST(req: Request) {
             content: [
               {
                 type: "text",
-                text: `Ты анализируешь фото чека или квитанции. Извлеки данные и верни JSON:
+                text: `Ты — профессиональный финансовый помощник. Проанализируй фото чека и извлеки данные в формате JSON:
 {
-  "items": [{ "name": "название товара/услуги", "amount": число }],
-  "total": число,
+  "items": [{ "name": "название товара", "price": число }],
+  "totalAmount": число,
   "currency": "UZS",
   "store": "название магазина или null",
   "date": "YYYY-MM-DD или null"
 }
-Правила: суммы — числа без пробелов и символов. Если валюта не определена — UZS. Если позиции не видны — items пустой массив. total обязателен.`,
+Правила:
+1. "items" — список купленных товаров.
+2. "totalAmount" — итоговая сумма чека (ОБЯЗАТЕЛЬНО).
+3. "currency" — валюта (по умолчанию UZS, если не указано иное).
+4. Суммы должны быть числами без пробелов.
+5. Если текст неразборчив, верни пустой список items, но постарайся найти totalAmount.
+6. Отвечай ТОЛЬКО чистым JSON.`,
               },
               {
                 type: "image_url",
-                image_url: { url: image },
+                image_url: { url: dataUrl },
               },
             ],
           },
@@ -55,17 +97,22 @@ export async function POST(req: Request) {
     const responseText = await res.text()
 
     if (!res.ok) {
-      console.error("Groq error:", responseText)
-      return NextResponse.json({ error: `Groq API: ${res.status} ${responseText.slice(0, 200)}` }, { status: 500 })
+      console.error(`${model} error:`, responseText)
+      return NextResponse.json({ error: `${model} error: ${res.status} ${responseText.slice(0, 200)}` }, { status: 500 })
     }
 
     const data = JSON.parse(responseText)
     const content = data.choices?.[0]?.message?.content ?? "{}"
-    const parsed = JSON.parse(content)
+    
+    // Sometimes models wrap JSON in markdown blocks
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    const cleanJson = jsonMatch ? jsonMatch[0] : content
+    
+    const parsed = JSON.parse(cleanJson)
 
-    // Ensure total is a number
-    if (!parsed.total || isNaN(parsed.total)) {
-      parsed.total = parsed.items?.reduce((s: number, i: { amount: number }) => s + (i.amount || 0), 0) ?? 0
+    // Fallback: calculate total if missing but items present
+    if ((!parsed.totalAmount || isNaN(parsed.totalAmount)) && parsed.items?.length > 0) {
+      parsed.totalAmount = parsed.items.reduce((s: number, i: any) => s + (i.price || 0), 0)
     }
 
     return NextResponse.json(parsed)

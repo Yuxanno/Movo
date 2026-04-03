@@ -288,9 +288,11 @@ flutter test
 
 ## 📚 Документация
 
-- **[DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)** - Структура Firestore, таблицы, индексы
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Clean Architecture, слои, data flow
-- **[CONTRIBUTION.md](./CONTRIBUTION.md)** - Руководство для контрибьютеров (Coming Soon)
+- **[DATABASE_SCHEMA.md](./docs/DATABASE_SCHEMA.md)** - Структура Firestore, таблицы, индексы
+- **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - Clean Architecture, слои, data flow
+- **[QUICK_START.md](./docs/QUICK_START.md)** - Быстрый старт и примеры
+- **[VISUAL_GUIDE.md](./docs/VISUAL_GUIDE.md)** - UI/UX и дизайн-система
+- **[Полный индекс](./docs/DOCUMENTATION_INDEX.md)** - Все документы проекта
 
 ---
 

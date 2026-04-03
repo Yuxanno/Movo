@@ -8,7 +8,12 @@ export async function GET(req: Request) {
     const userId = req.headers.get("x-user-id")
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const categories = await Category.find({ userId }).sort({ createdAt: 1 })
-    return NextResponse.json(categories)
+    // Ensure _id is a string
+    const result = categories.map(c => ({
+      ...c.toObject(),
+      _id: c._id.toString()
+    }))
+    return NextResponse.json(result)
   } catch {
     return NextResponse.json({ error: "Failed to fetch" }, { status: 500 })
   }
@@ -21,7 +26,7 @@ export async function POST(req: Request) {
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const body = await req.json()
     const category = await Category.create({ ...body, userId })
-    return NextResponse.json(category, { status: 201 })
+    return NextResponse.json({ ...category.toObject(), _id: category._id.toString() }, { status: 201 })
   } catch {
     return NextResponse.json({ error: "Failed to create" }, { status: 500 })
   }

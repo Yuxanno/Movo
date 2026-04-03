@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "app": "flutter run",
+    "app:build": "flutter build apk --release",
+    "app:bundle": "flutter build appbundle --release"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

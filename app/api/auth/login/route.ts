@@ -18,10 +18,17 @@ const DEFAULT_CATEGORIES = [
 
 export async function POST(req: Request) {
   try {
+    console.log("Login request received");
     await connectDB()
     const { login, password } = await req.json()
+    console.log("Searching for user:", login);
     const user = await User.findOne({ login, password })
-    if (!user) return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 })
+    if (!user) {
+      console.log("User not found or wrong password");
+      return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 })
+    }
+    console.log("User logged in:", user.login);
+    // Seed default categories if user has none
     // Seed default categories if user has none
     const count = await Category.countDocuments({ userId: user._id.toString() })
     if (count === 0) {

@@ -1,41 +1,40 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+class AccountModel {
+  final String id;
+  final String name;
+  final String icon;
+  final String color;
+  final double balance;
+  final String currency;
+  final bool isShared;
 
-part 'account_model.freezed.dart';
-part 'account_model.g.dart';
+  AccountModel({
+    required this.id,
+    required this.name,
+    required this.icon,
+    required this.color,
+    required this.balance,
+    required this.currency,
+    this.isShared = false,
+  });
 
-@freezed
-class AccountModel with _$AccountModel {
-  const factory AccountModel({
-    required String id,
-    required String userId,
-    required String name,
-    required String icon, // emoji
-    required double balance,
-    required String currency, // UZS, USD, RUB
-    required String color, // hex code
-    required bool isShared,
-    required String ownerId,
-    required DateTime createdAt,
-    required DateTime updatedAt,
-  }) = _AccountModel;
-
-  factory AccountModel.fromJson(Map<String, dynamic> json) =>
-      _$AccountModelFromJson(json);
-
-  // Mock factory for demo
-  factory AccountModel.demo() {
+  factory AccountModel.fromJson(Map<String, dynamic> json) {
     return AccountModel(
-      id: '1',
-      userId: 'user_1',
-      name: 'Дом',
-      icon: '🏠',
-      balance: 500000,
-      currency: 'UZS',
-      color: '#6366F1',
-      isShared: false,
-      ownerId: 'user_1',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+      id: json['_id'] ?? '',
+      name: json['name'] ?? '',
+      icon: json['icon'] ?? 'card',
+      color: json['color'] ?? '#22c55e',
+      balance: (json['balance'] ?? 0).toDouble(),
+      currency: json['currency'] ?? 'UZS',
+      isShared: json['isShared'] ?? false,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'icon': icon,
+    'color': color,
+    'balance': balance,
+    'currency': currency,
+    'isShared': isShared,
+  };
 }
