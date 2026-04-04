@@ -15,3 +15,11 @@ next.user-config.*
 node_modules/
 .next/
 .DS_Store
+
+# Flutter / Android
+android/local.properties
+android/.gradle/
+build/
+.dart_tool/
+*.g.dart
+*.freezed.dart

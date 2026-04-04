@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'models/account_model.dart';
 import 'models/transaction_model.dart';
 import 'models/category_model.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:3000/api';
+  static String get baseUrl => dotenv.env['API_BASE_URL'] ?? 'http://207.180.246.48:3000/api';
   String? _userId;
 
   void setUserId(String? id) => _userId = id;

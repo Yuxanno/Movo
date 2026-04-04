@@ -9,7 +9,17 @@
     "lint": "eslint .",
     "app": "flutter run",
     "app:build": "flutter build apk --release",
-    "app:bundle": "flutter build appbundle --release"
+    "app:build:debug": "flutter build apk --debug",
+    "app:build:split": "flutter build apk --release --split-per-abi",
+    "app:bundle": "flutter build appbundle --release",
+    "app:install": "flutter install",
+    "app:clean": "flutter clean",
+    "app:pub": "flutter pub get",
+    "app:pub:upgrade": "flutter pub upgrade",
+    "app:doctor": "flutter doctor -v",
+    "app:devices": "flutter devices",
+    "app:analyze": "flutter analyze",
+    "open": "flutter pub get && studio64 android"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
