@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'dart:async';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'data/app_store.dart';
 import 'presentation/screens/app_shell.dart';
@@ -19,6 +20,7 @@ final navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
   await initializeDateFormatting('ru', null);
   await initializeDateFormatting('en', null);
   await initializeDateFormatting('uz', null);

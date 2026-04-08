@@ -19,7 +19,7 @@
     "app:doctor": "flutter doctor -v",
     "app:devices": "flutter devices",
     "app:analyze": "flutter analyze",
-    "open": "flutter pub get && studio64 android"
+    "open": "flutter pub get && \"C:/Program Files/Android/Android Studio/bin/studio64.exe\" android"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
