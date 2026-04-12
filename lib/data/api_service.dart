@@ -6,7 +6,13 @@ import 'models/transaction_model.dart';
 import 'models/category_model.dart';
 
 class ApiService {
-  static String get baseUrl => dotenv.env['API_BASE_URL'] ?? 'http://207.180.246.48:3000/api';
+  static String get baseUrl {
+    try {
+      return dotenv.env['API_BASE_URL'] ?? 'http://207.180.246.48:3000/api';
+    } catch (_) {
+      return 'http://207.180.246.48:3000/api';
+    }
+  }
   String? _userId;
 
   void setUserId(String? id) => _userId = id;
