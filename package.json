@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "app": "flutter run",
+    "flutter": "flutter run -d chrome",
     "app:build": "flutter build apk --release",
     "app:build:debug": "flutter build apk --debug",
     "app:build:split": "flutter build apk --release --split-per-abi",
