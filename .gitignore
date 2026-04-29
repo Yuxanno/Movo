@@ -19,7 +19,10 @@ node_modules/
 # Flutter / Android
 android/local.properties
 android/.gradle/
+android/app/release/
 build/
+*.apk
+*.aab
 .dart_tool/
 *.g.dart
 *.freezed.dart
