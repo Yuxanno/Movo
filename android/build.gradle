@@ -9,9 +9,9 @@ rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
-subprojects {
-    project.evaluationDependsOn(':app')
-}
+
+// The subprojects evaluation dependency is removed to fix NPE in dev.flutter.flutter-gradle-plugin
+
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
