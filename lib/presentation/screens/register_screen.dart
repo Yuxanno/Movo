@@ -5,6 +5,7 @@ import '../../data/app_store.dart';
 import '../../data/api_service.dart';
 import 'app_shell.dart';
 import 'login_screen.dart';
+import '../../main.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -82,7 +83,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const AppShell()),
+          MaterialPageRoute(builder: (_) => const AppShellWithLifecycle()),
           (_) => false,
         );
       }
