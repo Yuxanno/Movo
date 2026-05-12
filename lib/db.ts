@@ -1,38 +1,39 @@
 import mongoose from "mongoose"
 
-const MONGODB_URI = process.env.MONGODB_URI!
+const MONGODB_URI = process.env.MONGODB_URI
 
 if (!MONGODB_URI) {
-  throw new Error("Please define MONGODB_URI in .env")
+  throw new Error("MONGODB_URI is not defined in .env")
+}
+
+type MongooseCache = {
+  conn: typeof mongoose | null
+  promise: Promise<typeof mongoose> | null
 }
 
 declare global {
   // eslint-disable-next-line no-var
-  var mongoose: { conn: mongoose.Connection | null; promise: Promise<mongoose.Connection> | null }
+  var mongooseCache: MongooseCache | undefined
 }
 
-let cached = global.mongoose
-if (!cached) cached = global.mongoose = { conn: null, promise: null }
+const cached: MongooseCache = global.mongooseCache ?? {
+  conn: null,
+  promise: null,
+}
+
+global.mongooseCache = cached
 
 export async function connectDB() {
   if (cached.conn) {
-    console.log("Using cached MongoDB connection");
     return cached.conn
   }
+
   if (!cached.promise) {
-    console.log("Connecting to MongoDB...");
-    cached.promise = mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 10000,
-      family: 4, // Force IPv4
-    }).then((m) => {
-      console.log("MongoDB Connected!");
-      return m.connection
-    }).catch(err => {
-      console.error("MongoDB connection error:", err);
-      throw err;
+    cached.promise = mongoose.connect(MONGODB_URI!, {
+      bufferCommands: false,
     })
   }
+
   cached.conn = await cached.promise
   return cached.conn
 }

@@ -1,5 +1,9 @@
 
 const mongoose = require('mongoose');
+const dns = require('dns');
+
+// Force Google DNS to fix SRV resolution issues
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 const MONGODB_URI = "mongodb+srv://moliya33w_db_user:7VHZ2F5PEBbMJSub@cluster0.qnzxsgd.mongodb.net/";
 
