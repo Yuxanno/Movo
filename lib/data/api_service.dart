@@ -77,13 +77,11 @@ class ApiService {
       
       final data = _decode(res);
       
-      // Status 200 means login is available
-      if (res.statusCode == 200) {
+      debugPrint('Check login response: status=${res.statusCode}, data=$data');
+      
+      // Both 200 and 409 return available field
+      if (res.statusCode == 200 || res.statusCode == 409) {
         return data['available'] == true;
-      }
-      // Status 409 means login is taken
-      if (res.statusCode == 409) {
-        return false;
       }
       return false;
     } catch (e) {
