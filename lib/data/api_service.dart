@@ -74,10 +74,20 @@ class ApiService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'login': login}),
       ).timeout(timeoutDuration);
-      if (res.statusCode == 200) return true;
-      if (res.statusCode == 409) return false;
+      
+      final data = _decode(res);
+      
+      // Status 200 means login is available
+      if (res.statusCode == 200) {
+        return data['available'] == true;
+      }
+      // Status 409 means login is taken
+      if (res.statusCode == 409) {
+        return false;
+      }
       return false;
     } catch (e) {
+      debugPrint('Check login error: $e');
       return false;
     }
   }

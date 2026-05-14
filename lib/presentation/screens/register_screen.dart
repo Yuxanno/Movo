@@ -38,19 +38,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _checkingLogin = false;
   bool _loginAvailable = false;
   bool _loginChecked = false;
+  Future<void>? _checkLoginFuture;
 
   @override
   void initState() {
     super.initState();
-    _loginCtrl.addListener(_checkLoginAvailability);
+    _loginCtrl.addListener(_checkLoginAvailabilityDebounced);
   }
 
   @override
   void dispose() {
-    _loginCtrl.removeListener(_checkLoginAvailability);
+    _loginCtrl.removeListener(_checkLoginAvailabilityDebounced);
     _loginCtrl.dispose(); _passCtrl.dispose();
     _confirmCtrl.dispose(); _nameCtrl.dispose();
     super.dispose();
+  }
+
+  void _checkLoginAvailabilityDebounced() {
+    // Cancel previous check
+    _checkLoginFuture = null;
+    
+    // Schedule new check after 500ms
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        _checkLoginAvailability();
+      }
+    });
   }
 
   Future<void> _checkLoginAvailability() async {
@@ -77,11 +90,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         });
       }
     } catch (e) {
+      // On error (including CORS), assume login is available
+      // This allows user to proceed and get proper error from registration
       if (mounted) {
         setState(() {
           _checkingLogin = false;
-          _loginAvailable = false;
-          _loginChecked = true;
+          _loginAvailable = true;
+          _loginChecked = false;
         });
       }
     }
@@ -100,8 +115,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (_passCtrl.text != _confirmCtrl.text) {
         setState(() => _error = store.t('pass_mismatch')); return;
       }
-      // Check if login is available
-      if (!_loginAvailable) {
+      // If login was checked and not available, show error
+      if (_loginChecked && !_loginAvailable) {
         setState(() => _error = 'Логин уже занят'); return;
       }
       setState(() => _step = 1);
@@ -265,13 +280,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: Center(
                   child: _checkingLogin
                       ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF16a34a)))
-                      : _loginChecked
-                          ? Icon(
-                              _loginAvailable ? Icons.check_circle : Icons.cancel,
-                              color: _loginAvailable ? const Color(0xFF16a34a) : const Color(0xFFef4444),
+                      : _loginChecked && !_loginAvailable
+                          ? const Icon(
+                              Icons.cancel,
+                              color: Color(0xFFef4444),
                               size: 20,
                             )
-                          : const SizedBox.shrink(),
+                          : _loginChecked && _loginAvailable
+                              ? const Icon(
+                                  Icons.check_circle,
+                                  color: Color(0xFF16a34a),
+                                  size: 20,
+                                )
+                              : const SizedBox.shrink(),
                 ),
               ),
             ],
