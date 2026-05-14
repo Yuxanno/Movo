@@ -66,6 +66,22 @@ class ApiService {
     return data;
   }
 
+  static Future<bool> checkLoginAvailable(String login) async {
+    if (login.isEmpty) return false;
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/auth/check-login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'login': login}),
+      ).timeout(timeoutDuration);
+      if (res.statusCode == 200) return true;
+      if (res.statusCode == 409) return false;
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // ── Accounts ──
   Future<List<AccountModel>> fetchAccounts() async {
     final res = await http.get(Uri.parse('$baseUrl/accounts'), headers: _headers).timeout(timeoutDuration);

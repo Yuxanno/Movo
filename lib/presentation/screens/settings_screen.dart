@@ -122,7 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               } else {
                                 await Navigator.push(context, MaterialPageRoute(
                                   builder: (_) => PinScreen(
-                                    title: store.lang == 'ru' ? "Введите текущий PIN" : "Enter current PIN",
+                                    title: store.t('enter_current_pin'),
                                     onSuccess: () async {
                                       final p = await SharedPreferences.getInstance();
                                       await p.remove('pin_code');
@@ -166,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (savedPin != null) {
                     navigatorKey.currentState!.push(MaterialPageRoute(
                       builder: (_) => PinScreen(
-                        title: store.lang == 'ru' ? 'Подтвердите выход' : 'Confirm logout',
+                        title: store.t('confirm_logout'),
                         onSuccess: () async {
                           await context.read<AppStore>().logout();
                           navigatorKey.currentState!.pushAndRemoveUntil(

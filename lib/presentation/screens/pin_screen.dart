@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import '../../data/app_store.dart';
 import 'app_shell.dart';
 
 class PinScreen extends StatefulWidget {
@@ -49,7 +51,7 @@ class _PinScreenState extends State<PinScreen> {
             widget.onSuccess!();
           }
         } else {
-          _handleError("Неверный PIN-код");
+          _handleError(context.read<AppStore>().t('invalid_pin'));
         }
         return;
       }
@@ -67,7 +69,7 @@ class _PinScreenState extends State<PinScreen> {
             }
           }
         } else {
-          _handleError("PIN-коды не совпадают");
+          _handleError(context.read<AppStore>().t('pins_not_match'));
         }
         return;
       }
@@ -77,7 +79,7 @@ class _PinScreenState extends State<PinScreen> {
         if (_pin == savedPin) {
           if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AppShell()));
         } else {
-          _handleError("Неверный PIN-код");
+          _handleError(context.read<AppStore>().t('invalid_pin'));
         }
       } else {
         // Start Creation flow: Move to confirmation stage on the same screen
@@ -104,8 +106,9 @@ class _PinScreenState extends State<PinScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String title = widget.title ?? "Введите PIN-код";
-    if (_isConfirmStage) title = "Повторите PIN-код";
+    final store = context.watch<AppStore>();
+    String title = widget.title ?? store.t('enter_pin');
+    if (_isConfirmStage) title = store.t('pin_repeat');
     if (_error) title = _errorMessage;
 
     return Scaffold(

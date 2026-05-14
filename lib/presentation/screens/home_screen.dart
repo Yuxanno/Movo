@@ -119,7 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               const Icon(Icons.add_circle_outline, size: 48, color: Color(0xFF9ca3af)),
               const SizedBox(height: 8),
-              Text(store.lang == 'ru' ? 'Добавить счёт' : 'Add Account', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF9ca3af))),
+              Text(store.t('add_account'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF9ca3af))),
             ]),
           ),
         ),
@@ -199,8 +199,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final actions = [
       {'label': store.t('income'), 'icon': Icons.arrow_upward, 'color': const Color(0xFF16a34a)},
       {'label': store.t('expense'), 'icon': Icons.arrow_downward, 'color': const Color(0xFFef4444)},
-      {'label': store.lang == 'ru' ? 'История' : 'History', 'icon': Icons.access_time, 'color': const Color(0xFF6366f1)},
-      {'label': store.lang == 'ru' ? 'Чек' : 'Check', 'icon': Icons.receipt_long, 'color': const Color(0xFFf59e0b)},
+      {'label': store.t('history_tab'), 'icon': Icons.access_time, 'color': const Color(0xFF6366f1)},
+      {'label': store.t('receipt_tab'), 'icon': Icons.receipt_long, 'color': const Color(0xFFf59e0b)},
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -215,11 +215,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               GestureDetector(
                 onTap: () {
                   final label = a['label'] as String;
-                  if (label == 'Чек' || label == 'Check') {
+                  if (label == store.t('receipt_tab')) {
                     showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const ReceiptScannerSheet());
                   } else if (label == store.t('income') || label == store.t('expense')) {
                     if (widget.onAddTransaction != null) widget.onAddTransaction!();
-                  } else if (label == 'История' || label == 'History') {
+                  } else if (label == store.t('history_tab')) {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => ChangeNotifierProvider.value(value: context.read<AppStore>(), child: const TransactionsScreen())));
                   }
                 },
@@ -248,12 +248,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(store.t('balance_dyn'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
-              Text(store.lang == 'ru' ? '30 дней' : '30 days', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+              Text(store.t('30_days'), style: TextStyle(fontSize: 12, color: Colors.grey[400])),
             ]),
             const SizedBox(height: 10),
             SizedBox(
               height: 80,
-              child: CustomPaint(size: const Size(double.infinity, 80), painter: _BalanceChartPainter(store.transactions, store.totalBalance)),
+              child: CustomPaint(size: const Size(double.infinity, 80), painter: _BalanceChartPainter(store.transactions, store.totalBalance, store)),
             ),
           ],
         ),
@@ -319,12 +319,12 @@ class _BankCard extends StatelessWidget {
             if (account.isShared) ...[const Spacer(), Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(color: Colors.white.withAlpha(51), borderRadius: BorderRadius.circular(8)),
-              child: Text(store.lang == 'ru' ? 'Совместный' : 'Shared', style: const TextStyle(fontSize: 10, color: Colors.white)),
+              child: Text(store.t('shared'), style: const TextStyle(fontSize: 10, color: Colors.white)),
             )],
           ]),
           // Balance
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(store.lang == 'ru' ? 'Баланс' : 'Balance', style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(153))),
+            Text(store.t('balance'), style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(153))),
             const SizedBox(height: 2),
             Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
               Text(formatAmount(account.balance), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -434,12 +434,13 @@ class _SparkPainter extends CustomPainter {
 class _BalanceChartPainter extends CustomPainter {
   final List<TransactionModel> transactions;
   final double totalBalance;
-  _BalanceChartPainter(this.transactions, this.totalBalance);
+  final AppStore store;
+  _BalanceChartPainter(this.transactions, this.totalBalance, this.store);
 
   @override
   void paint(Canvas canvas, Size size) {
     if (transactions.length < 2) {
-      final tp = TextPainter(text: TextSpan(text: transactions.isEmpty ? 'Нет данных' : 'Мало данных', style: const TextStyle(color: Color(0xFF9ca3af), fontSize: 12)), textDirection: TextDirection.ltr)..layout();
+      final tp = TextPainter(text: TextSpan(text: transactions.isEmpty ? store.t('no_data') : store.t('not_enough_data'), style: const TextStyle(color: Color(0xFF9ca3af), fontSize: 12)), textDirection: TextDirection.ltr)..layout();
       tp.paint(canvas, Offset(size.width / 2 - tp.width / 2, size.height / 2 - tp.height / 2));
       return;
     }

@@ -60,11 +60,11 @@ class _AppShellState extends State<AppShell> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _NavItem(icon: Icons.home, label: 'Dashboard', active: _index == 0, onTap: () => setState(() => _index = 0)),
-              _NavItem(icon: Icons.credit_card, label: 'Счета', active: _index == 1, onTap: () => setState(() => _index = 1)),
+              _NavItem(icon: Icons.home, label: context.watch<AppStore>().t('dashboard'), active: _index == 0, onTap: () => setState(() => _index = 0)),
+              _NavItem(icon: Icons.credit_card, label: context.watch<AppStore>().t('accounts'), active: _index == 1, onTap: () => setState(() => _index = 1)),
               const SizedBox(width: 48), // Space for FAB
-              _NavItem(icon: Icons.bar_chart, label: 'Аналитика', active: _index == 3, onTap: () => setState(() => _index = 3)),
-              _NavItem(icon: Icons.person_outline, label: 'Профиль', active: _index == 4, onTap: () => setState(() => _index = 4)),
+              _NavItem(icon: Icons.bar_chart, label: context.watch<AppStore>().t('analytics'), active: _index == 3, onTap: () => setState(() => _index = 3)),
+              _NavItem(icon: Icons.person_outline, label: context.watch<AppStore>().t('step_profile'), active: _index == 4, onTap: () => setState(() => _index = 4)),
             ],
           ),
         ),

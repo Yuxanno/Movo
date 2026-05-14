@@ -13,8 +13,7 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  int _step = 0; // 0=Аккаунт, 1=Профиль, 2=PIN, 3=Готово
-  final _steps = ['Аккаунт', 'Профиль', 'PIN-код', 'Готово'];
+  int _step = 0; // 0=Account, 1=Profile, 2=PIN, 3=Done
 
   // Step 0
   final _loginCtrl = TextEditingController();
@@ -35,29 +34,80 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _loading = false;
   String _error = '';
 
+  // Real-time login validation
+  bool _checkingLogin = false;
+  bool _loginAvailable = false;
+  bool _loginChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loginCtrl.addListener(_checkLoginAvailability);
+  }
+
   @override
   void dispose() {
+    _loginCtrl.removeListener(_checkLoginAvailability);
     _loginCtrl.dispose(); _passCtrl.dispose();
     _confirmCtrl.dispose(); _nameCtrl.dispose();
     super.dispose();
   }
 
+  Future<void> _checkLoginAvailability() async {
+    final login = _loginCtrl.text.trim();
+    
+    if (login.isEmpty) {
+      setState(() {
+        _checkingLogin = false;
+        _loginAvailable = false;
+        _loginChecked = false;
+      });
+      return;
+    }
+
+    setState(() => _checkingLogin = true);
+    
+    try {
+      final available = await ApiService.checkLoginAvailable(login);
+      if (mounted) {
+        setState(() {
+          _checkingLogin = false;
+          _loginAvailable = available;
+          _loginChecked = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _checkingLogin = false;
+          _loginAvailable = false;
+          _loginChecked = true;
+        });
+      }
+    }
+  }
+
   Future<void> _handleNext() async {
+    final store = context.read<AppStore>();
     setState(() => _error = '');
     if (_step == 0) {
       if (_loginCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
-        setState(() => _error = 'Заполните все поля'); return;
+        setState(() => _error = store.t('fill_fields')); return;
       }
       if (_passCtrl.text.length < 6) {
-        setState(() => _error = 'Пароль минимум 6 символов'); return;
+        setState(() => _error = store.t('pass_min')); return;
       }
       if (_passCtrl.text != _confirmCtrl.text) {
-        setState(() => _error = 'Пароли не совпадают'); return;
+        setState(() => _error = store.t('pass_mismatch')); return;
+      }
+      // Check if login is available
+      if (!_loginAvailable) {
+        setState(() => _error = 'Логин уже занят'); return;
       }
       setState(() => _step = 1);
     } else if (_step == 1) {
       if (_nameCtrl.text.isEmpty) {
-        setState(() => _error = 'Введите имя'); return;
+        setState(() => _error = store.t('enter_name')); return;
       }
       setState(() { _loading = true; });
       try {
@@ -121,6 +171,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final store = context.watch<AppStore>();
+    final _steps = [store.t('step_account'), store.t('step_profile'), store.t('step_pin'), store.t('step_done')];
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(children: [
@@ -141,10 +194,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
               if (_step > 0 && _step < 3) const SizedBox(width: 12),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Регистрация', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
-                Text(_steps[_step], style: TextStyle(fontSize: 13, color: Colors.white.withAlpha(204))),
-              ]),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(store.t('register_title'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+                  Text(_steps[_step], style: TextStyle(fontSize: 13, color: Colors.white.withAlpha(204))),
+                ]),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.language, color: Colors.white),
+                onSelected: (l) => context.read<AppStore>().setLanguage(l),
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'ru', child: Text('Русский')),
+                  const PopupMenuItem(value: 'en', child: Text('English')),
+                  const PopupMenuItem(value: 'uz', child: Text('Oʻzbekcha')),
+                ],
+              ),
             ]),
             const SizedBox(height: 16),
             Row(children: List.generate(_steps.length, (i) => Expanded(child: Container(
@@ -174,6 +238,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildFormStep() {
+    final store = context.watch<AppStore>();
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -186,14 +251,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
 
         if (_step == 0) ...[
-          const Text('Создайте аккаунт', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF1f2937))),
+          Text(store.t('create_account'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF1f2937))),
           const SizedBox(height: 4),
-          const Text('Придумайте логин и пароль', style: TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
+          Text(store.t('create_account_desc'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
           const SizedBox(height: 20),
-          _InputField(controller: _loginCtrl, hint: 'Логин', icon: Icons.person_outline, action: TextInputAction.next),
+          Stack(
+            children: [
+              _InputField(controller: _loginCtrl, hint: store.t('login_hint'), icon: Icons.person_outline, action: TextInputAction.next),
+              Positioned(
+                right: 14,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: _checkingLogin
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF16a34a)))
+                      : _loginChecked
+                          ? Icon(
+                              _loginAvailable ? Icons.check_circle : Icons.cancel,
+                              color: _loginAvailable ? const Color(0xFF16a34a) : const Color(0xFFef4444),
+                              size: 20,
+                            )
+                          : const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
           _InputField(
-            controller: _passCtrl, hint: 'Пароль (мин. 6 символов)',
+            controller: _passCtrl, hint: store.t('pass_hint_reg'),
             icon: Icons.lock_outline, obscure: !_showPass,
             action: TextInputAction.next,
             suffix: GestureDetector(
@@ -205,7 +290,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 10),
           _InputField(
             controller: _confirmCtrl, 
-            hint: 'Повторите пароль', 
+            hint: store.t('pass_repeat'), 
             icon: Icons.verified_outlined, 
             obscure: true,
             action: TextInputAction.done,
@@ -214,13 +299,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ],
 
         if (_step == 1) ...[
-          const Text('О себе', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF1f2937))),
+          Text(store.t('about_me'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF1f2937))),
           const SizedBox(height: 4),
-          const Text('Имя и основная валюта', style: TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
+          Text(store.t('name_currency'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
           const SizedBox(height: 20),
           _InputField(
             controller: _nameCtrl, 
-            hint: 'Ваше имя', 
+            hint: store.t('your_name'), 
             icon: Icons.person_outline,
             action: TextInputAction.done,
             onSubmitted: (_) => _handleNext(),
@@ -254,11 +339,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: const Icon(Icons.check, size: 48, color: Color(0xFF16a34a)),
             ),
             const SizedBox(height: 16),
-            const Text('Готово!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF1f2937))),
+            Text(store.t('done_title'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF1f2937))),
             const SizedBox(height: 8),
-            const Text('Аккаунт создан. Начните управлять\nсвоими финансами.',
+            Text(store.t('done_desc'),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
           ])),
         ],
 
@@ -275,7 +360,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             child: _loading
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : Text(_step == 3 ? 'Начать' : 'Далее',
+                : Text(_step == 3 ? store.t('start_btn') : store.t('next_btn'),
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ),
@@ -284,10 +369,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 20),
           Center(child: GestureDetector(
             onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
-            child: RichText(text: const TextSpan(
-              text: 'Уже есть аккаунт? ',
-              style: TextStyle(fontSize: 14, color: Color(0xFF9ca3af)),
-              children: [TextSpan(text: 'Войти', style: TextStyle(color: Color(0xFF16a34a), fontWeight: FontWeight.bold))],
+            child: RichText(text: TextSpan(
+              text: store.t('has_account'),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af)),
+              children: [TextSpan(text: store.t('login_link'), style: const TextStyle(color: Color(0xFF16a34a), fontWeight: FontWeight.bold))],
             )),
           )),
         ],
@@ -296,11 +381,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildPinStep() {
+    final store = context.watch<AppStore>();
     final title = _pinError
-        ? 'PIN не совпадает, попробуйте снова'
+        ? store.t('pin_mismatch')
         : _pinConfirming
-            ? 'Повторите PIN-код'
-            : 'Придумайте PIN-код';
+            ? store.t('pin_repeat')
+            : store.t('pin_create');
 
     return Column(children: [
       const SizedBox(height: 32),
@@ -310,8 +396,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           color: _pinError ? const Color(0xFFef4444) : const Color(0xFF1f2937),
         )),
       const SizedBox(height: 6),
-      const Text('Он будет запрашиваться при каждом входе',
-        style: TextStyle(fontSize: 13, color: Color(0xFF9ca3af))),
+      Text(store.t('pin_desc'),
+        style: const TextStyle(fontSize: 13, color: Color(0xFF9ca3af))),
       const SizedBox(height: 32),
       // Dots
       Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(4, (i) => Container(
@@ -342,8 +428,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
           GestureDetector(
             onTap: _skipPin,
-            child: const SizedBox(width: 72, height: 72,
-              child: Center(child: Text('Пропустить', style: TextStyle(fontSize: 12, color: Color(0xFF9ca3af))))),
+            child: SizedBox(width: 72, height: 72,
+              child: Center(child: Text(store.t('skip'), style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))))),
           ),
           _PinButton(text: '0', onTap: () => _onPinKey('0')),
           _PinButton(icon: Icons.backspace_outlined, onTap: _onPinBack, isAction: true),
@@ -421,7 +507,7 @@ class _InputField extends StatelessWidget {
             hintText: hint,
             hintStyle: const TextStyle(color: Color(0xFF9ca3af), fontSize: 14),
             border: InputBorder.none, isDense: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
           ),
           style: const TextStyle(fontSize: 14, color: Color(0xFF1f2937)),
         )),

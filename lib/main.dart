@@ -119,6 +119,7 @@ class _ConnectionWrapperState extends State<ConnectionWrapper> {
   @override
   Widget build(BuildContext context) {
     if (_isNone || _isNoInternet) {
+      final store = context.watch<AppStore>();
       return Scaffold(
         backgroundColor: const Color(0xFF16a34a),
         body: Center(
@@ -130,12 +131,12 @@ class _ConnectionWrapperState extends State<ConnectionWrapper> {
                 const Icon(Icons.wifi_off_rounded, size: 80, color: Colors.white),
                 const SizedBox(height: 24),
                 Text(
-                  _isNone ? 'Wi-Fi выключен' : 'Нет интернета',
+                  _isNone ? store.t('wifi_off') : store.t('no_internet'),
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _isNone ? 'Включите интернет, чтобы продолжить' : 'Связь есть, но интернет заблокирован или отсутствует',
+                  _isNone ? store.t('turn_on_net') : store.t('net_blocked'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white.withAlpha(204)),
                 ),
@@ -145,7 +146,7 @@ class _ConnectionWrapperState extends State<ConnectionWrapper> {
                     if (kIsWeb) { _check(); } else { AppSettings.openAppSettings(type: AppSettingsType.wifi); }
                   } : _check,
                   icon: Icon(_isNone ? (kIsWeb ? Icons.refresh : Icons.settings) : Icons.refresh),
-                  label: Text(_isNone ? (kIsWeb ? 'Обновить' : 'Настройки') : 'Попробовать снова'),
+                  label: Text(_isNone ? (kIsWeb ? store.t('update_btn') : store.t('settings_btn')) : store.t('try_again')),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: const Color(0xFF16a34a),

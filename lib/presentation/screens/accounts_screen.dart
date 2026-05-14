@@ -48,7 +48,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // Header
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Мои счета', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+              Text(store.t('my_accounts'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
               GestureDetector(
                 onTap: () => setState(() => _showForm = !_showForm),
                 child: Container(width: 36, height: 36, decoration: BoxDecoration(color: const Color(0xFF16a34a), borderRadius: BorderRadius.circular(18)),
@@ -58,7 +58,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
             const SizedBox(height: 16),
 
             // Add form
-            if (_showForm) _buildForm(),
+            if (_showForm) _buildForm(store),
 
             // Account list
             if (store.accounts.isEmpty)
@@ -67,7 +67,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                 child: Column(children: [
                   const Icon(Icons.credit_card, size: 48, color: Color(0xFFd1d5db)),
                   const SizedBox(height: 12),
-                  const Text('Нет счетов. Создайте первый!', style: TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
+                  Text(store.t('no_accounts_yet'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
                 ]),
               ))
             else
@@ -82,20 +82,20 @@ class _AccountsScreenState extends State<AccountsScreen> {
     );
   }
 
-  Widget _buildForm() {
+  Widget _buildForm(AppStore store) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8)]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Новый счёт', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
+        Text(store.t('new_account'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
         const SizedBox(height: 12),
         TextField(
           onChanged: (v) => _name = v,
-          decoration: InputDecoration(hintText: 'Название (Дом, Семья, Бизнес...)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFe5e7eb))), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), isDense: true),
+          decoration: InputDecoration(hintText: store.lang == 'ru' ? 'Название (Дом, Семья, Бизнес...)' : store.lang == 'uz' ? 'Nomi (Uy, Oila...)' : 'Name (Home, Family...)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFe5e7eb))), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), isDense: true),
         ),
         const SizedBox(height: 12),
-        const Text('Валюта', style: TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
+        Text(store.t('currency_label'), style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
         const SizedBox(height: 6),
         Row(children: _currencies.map((c) => Padding(
           padding: const EdgeInsets.only(right: 8),
@@ -114,7 +114,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
           child: ElevatedButton(
             onPressed: _saving ? null : _addAccount,
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16a34a), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: Text(_saving ? 'Сохранение...' : 'Создать счёт', style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(_saving ? store.t('saving') : store.t('add_account'), style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
         ),
       ]),
@@ -199,7 +199,7 @@ class _AccountDetailState extends State<_AccountDetail> {
               child: Row(children: [
                 const Icon(Icons.arrow_back, size: 18, color: Color(0xFF6b7280)),
                 const SizedBox(width: 8),
-                const Text('Назад', style: TextStyle(fontSize: 14, color: Color(0xFF6b7280))),
+                Text(store.t('back_btn'), style: const TextStyle(fontSize: 14, color: Color(0xFF6b7280))),
               ]),
             ),
             const SizedBox(height: 16),
@@ -224,7 +224,7 @@ class _AccountDetailState extends State<_AccountDetail> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(color: Colors.white.withAlpha(38), borderRadius: BorderRadius.circular(12)),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Доходы', style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
+                      Text(store.t('income'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
                       Text('+${formatAmount(income)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
                     ]),
                   )),
@@ -233,7 +233,7 @@ class _AccountDetailState extends State<_AccountDetail> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(color: Colors.white.withAlpha(38), borderRadius: BorderRadius.circular(12)),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Расходы', style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
+                      Text(store.t('expense'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
                       Text('−${formatAmount(expense)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
                     ]),
                   )),
@@ -246,7 +246,7 @@ class _AccountDetailState extends State<_AccountDetail> {
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8)]),
               child: Row(children: [
-                for (final f in [['all', 'Все'], ['income', 'Доходы'], ['expense', 'Расходы']])
+                for (final f in [['all', store.t('all')], ['income', store.t('income')], ['expense', store.t('expense')]])
                   Expanded(child: GestureDetector(
                     onTap: () => setState(() => _filter = f[0]),
                     child: Container(
@@ -259,7 +259,7 @@ class _AccountDetailState extends State<_AccountDetail> {
             ),
             const SizedBox(height: 16),
             if (txs.isEmpty)
-              const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 48), child: Text('Нет транзакций', style: TextStyle(fontSize: 14, color: Color(0xFF9ca3af)))))
+              Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 48), child: Text(store.t('no_txs'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af)))))
             else
               ...txs.map((t) {
                 final isIncome = t.type == 'income';

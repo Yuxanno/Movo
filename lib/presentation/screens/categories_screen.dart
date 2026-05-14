@@ -143,7 +143,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8)]),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
-                        Text('${store.t('expense')} за месяц: ', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+                        Text(store.lang == 'ru' ? '${store.t('expense')} за месяц: ' : store.lang == 'uz' ? 'Oy uchun ${store.t('expense').toLowerCase()}: ' : '${store.t('expense')} for month: ', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
                         Text(formatAmount(totalExpenses), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF16a34a))),
                       ]),
                       const SizedBox(height: 12),
@@ -200,13 +200,13 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   ),
                   const SizedBox(height: 12),
                   // List
-                  Text(store.t('categories') + ' (список)', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
+                  Text(store.lang == 'ru' ? '${store.t('categories')} (список)' : store.lang == 'uz' ? '${store.t('categories')} (ro\'yxat)' : '${store.t('categories')} (list)', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
                   const SizedBox(height: 8),
                   if (filtered.isEmpty)
-                    const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Column(children: [
-                      Icon(Icons.label_outline, size: 40, color: Color(0xFFd1d5db)),
-                      SizedBox(height: 8),
-                      Text('Нет категорий', style: TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
+                    Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 40), child: Column(children: [
+                      const Icon(Icons.label_outline, size: 40, color: Color(0xFFd1d5db)),
+                      const SizedBox(height: 8),
+                      Text(store.t('no_categories'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
                     ])))
                   else
                     ...filtered.map((cat) => _CategoryRow(
@@ -215,19 +215,20 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       total: _totalByCategory(cat, store),
                       monthTotal: _monthByCategory(cat, store),
                       onDelete: () => store.deleteCategory(cat.id),
+                      store: store,
                     )),
                 ],
               ),
             ),
           ]),
           // Add form bottom sheet
-          if (_showForm) _buildAddForm(),
+          if (_showForm) _buildAddForm(store),
         ],
       ),
     );
   }
 
-  Widget _buildAddForm() {
+  Widget _buildAddForm(AppStore store) {
     return GestureDetector(
       onTap: () => setState(() => _showForm = false),
       child: Container(
@@ -242,7 +243,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  const Text('Новая категория', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+                  Text(store.t('new_category'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
                   GestureDetector(
                     onTap: () => setState(() => _showForm = false),
                     child: Container(width: 28, height: 28, decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(14)),
@@ -254,7 +255,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   controller: _nameCtrl,
                   onChanged: (v) => _formName = v,
                   decoration: InputDecoration(
-                    hintText: 'Название',
+                    hintText: store.lang == 'ru' ? 'Название' : store.lang == 'uz' ? 'Nomi' : 'Name',
                     hintStyle: const TextStyle(color: Color(0xFF9ca3af)),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFe5e7eb))),
                     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF16a34a))),
@@ -264,7 +265,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 ),
                 const SizedBox(height: 12),
                 Row(children: [
-                  for (final t in [['expense', 'Расход'], ['income', 'Доход']])
+                  for (final t in [['expense', store.t('expense')], ['income', store.t('income')]])
                     Expanded(child: Padding(
                       padding: EdgeInsets.only(right: t[0] == 'expense' ? 6 : 0),
                       child: GestureDetector(
@@ -283,7 +284,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     )),
                 ]),
                 const SizedBox(height: 12),
-                const Text('Иконка', style: TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
+                Text(store.t('icon_label'), style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
                 const SizedBox(height: 6),
                 Wrap(spacing: 6, runSpacing: 6, children: _iconOptions.map((ic) {
                   final selected = _formIcon == ic['id'];
@@ -302,7 +303,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   );
                 }).toList()),
                 const SizedBox(height: 12),
-                const Text('Цвет', style: TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
+                Text(store.t('color_label'), style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
                 const SizedBox(height: 6),
                 Wrap(spacing: 8, children: _colors.map((c) => GestureDetector(
                   onTap: () => setState(() => _formColor = c),
@@ -326,7 +327,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: Text(_saving ? 'Сохранение...' : 'Добавить', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    child: Text(_saving ? (store.lang == 'ru' ? 'Сохранение...' : store.lang == 'uz' ? 'Saqlanmoqda...' : 'Saving...') : (store.lang == 'ru' ? 'Добавить' : store.lang == 'uz' ? 'Qo\'shish' : 'Add'), style: const TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 ),
               ]),
@@ -344,7 +345,8 @@ class _CategoryRow extends StatelessWidget {
   final double total;
   final double monthTotal;
   final VoidCallback onDelete;
-  const _CategoryRow({required this.cat, required this.name, required this.total, required this.monthTotal, required this.onDelete});
+  final AppStore store;
+  const _CategoryRow({required this.cat, required this.name, required this.total, required this.monthTotal, required this.onDelete, required this.store});
 
   @override
   Widget build(BuildContext context) {
@@ -360,7 +362,7 @@ class _CategoryRow extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
-          const Text('Текущий месяц', style: TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
+          Text(store.t('current_month'), style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
         ])),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(formatAmount(total), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),

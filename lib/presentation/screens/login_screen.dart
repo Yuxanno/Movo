@@ -29,7 +29,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleLogin() async {
     if (_loginCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
-      setState(() => _error = 'Заполните все поля');
+      final store = context.read<AppStore>();
+      setState(() => _error = store.t('fill_fields'));
       return;
     }
     setState(() { _loading = true; _error = ''; });
@@ -50,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (savedPin != null && mounted) {
         navigatorKey.currentState!.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => PinScreen(
-            title: 'Подтвердите вход',
+            title: store.t('confirm_login'),
             onSuccess: () => navigatorKey.currentState!.pushAndRemoveUntil(
               MaterialPageRoute(builder: (_) => const AppShellWithLifecycle()),
               (_) => false,
@@ -77,22 +78,39 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: Colors.white,
       body: Column(children: [
         // Hero
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 32, 24, 48),
-          color: const Color(0xFF16a34a),
-          child: Column(children: [
+        Stack(
+          children: [
             Container(
-              width: 80, height: 80,
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24),
-                boxShadow: [BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 16)]),
-              child: const Center(child: Icon(Icons.location_on, color: Color(0xFF16a34a), size: 40)),
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 32, 24, 48),
+              color: const Color(0xFF16a34a),
+              child: Column(children: [
+                Container(
+                  width: 80, height: 80,
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24),
+                    boxShadow: [BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 16)]),
+                  child: const Center(child: Icon(Icons.location_on, color: Color(0xFF16a34a), size: 40)),
+                ),
+                const SizedBox(height: 12),
+                const Text('Movo', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5)),
+                const SizedBox(height: 4),
+                Text(context.watch<AppStore>().t('slogan'), style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(204))),
+              ]),
             ),
-            const SizedBox(height: 12),
-            const Text('Movo', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5)),
-            const SizedBox(height: 4),
-            Text('Управляй финансами легко', style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(204))),
-          ]),
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              right: 16,
+              child: PopupMenuButton<String>(
+                icon: const Icon(Icons.language, color: Colors.white),
+                onSelected: (l) => context.read<AppStore>().setLanguage(l),
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'ru', child: Text('Русский')),
+                  const PopupMenuItem(value: 'en', child: Text('English')),
+                  const PopupMenuItem(value: 'uz', child: Text('Oʻzbekcha')),
+                ],
+              ),
+            ),
+          ],
         ),
         // Form
         Expanded(
@@ -102,9 +120,9 @@ class _LoginScreenState extends State<LoginScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Вход', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF1f2937))),
+                Text(context.watch<AppStore>().t('login_title'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF1f2937))),
                 const SizedBox(height: 4),
-                const Text('Войдите в свой аккаунт', style: TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
+                Text(context.watch<AppStore>().t('login_subtitle'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
                 const SizedBox(height: 24),
                 if (_error.isNotEmpty)
                   Container(
@@ -115,14 +133,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 _InputField(
                   controller: _loginCtrl, 
-                  hint: 'Логин', 
+                  hint: context.watch<AppStore>().t('login_hint'), 
                   icon: Icons.person_outline,
                   action: TextInputAction.next,
                 ),
                 const SizedBox(height: 12),
                 _InputField(
                   controller: _passCtrl, 
-                  hint: 'Пароль', 
+                  hint: context.watch<AppStore>().t('pass_hint'), 
                   icon: Icons.lock_outline,
                   obscure: !_showPass,
                   action: TextInputAction.done,
@@ -145,16 +163,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: _loading
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text('Войти', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        : Text(context.watch<AppStore>().t('login_btn'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Center(child: GestureDetector(
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
-                  child: RichText(text: const TextSpan(
-                    text: 'Нет аккаунта? ',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF9ca3af)),
-                    children: [TextSpan(text: 'Зарегистрироваться', style: TextStyle(color: Color(0xFF16a34a), fontWeight: FontWeight.bold))],
+                  child: RichText(text: TextSpan(
+                    text: context.watch<AppStore>().t('no_account'),
+                    style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af)),
+                    children: [TextSpan(text: context.watch<AppStore>().t('register_link'), style: const TextStyle(color: Color(0xFF16a34a), fontWeight: FontWeight.bold))],
                   )),
                 )),
               ]),
