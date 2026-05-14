@@ -21,9 +21,9 @@ export async function POST(req: Request) {
     await connectDB()
     const { login, password, name, currency } = await req.json()
     if (!login || !password) return NextResponse.json({ error: "Заполните все поля" }, { status: 400 })
-    const exists = await User.findOne({ login })
+    const exists = await User.findOne({ login: login.trim() })
     if (exists) return NextResponse.json({ error: "Логин уже занят" }, { status: 409 })
-    const user = await User.create({ login, password, name, currency })
+    const user = await User.create({ login: login.trim(), password, name, currency })
     await Category.insertMany(DEFAULT_CATEGORIES.map(c => ({ ...c, userId: user._id.toString() })))
     return NextResponse.json({ _id: user._id, login: user.login, name: user.name, currency: user.currency }, { status: 201 })
   } catch {
