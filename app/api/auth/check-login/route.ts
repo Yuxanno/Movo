@@ -2,28 +2,51 @@ import { NextResponse } from "next/server"
 import { connectDB } from "@/lib/db"
 import { User } from "@/lib/models/User"
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  })
+}
+
 export async function POST(req: Request) {
   try {
     await connectDB()
     const { login } = await req.json()
     
-    console.log("Checking login availability for:", login)
-    
-    if (!login) {
-      return NextResponse.json({ available: false, error: "Login is required" }, { status: 400 })
+    if (!login || login.trim().length === 0) {
+      return new NextResponse(JSON.stringify({ available: false }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      })
     }
     
     const exists = await User.findOne({ login: login.trim() })
     
-    console.log("User exists:", !!exists)
-    
-    if (exists) {
-      return NextResponse.json({ available: false }, { status: 200 })
-    }
-    
-    return NextResponse.json({ available: true }, { status: 200 })
+    return new NextResponse(
+      JSON.stringify({ available: !exists }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    )
   } catch (error) {
-    console.error("Check login error:", error)
-    return NextResponse.json({ available: false, error: "Server error" }, { status: 500 })
+    return new NextResponse(JSON.stringify({ available: false }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    })
   }
 }
