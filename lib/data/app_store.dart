@@ -345,8 +345,59 @@ class AppStore extends ChangeNotifier {
     return inUZS / (rates[to] ?? 1);
   }
 
+  // Маппинг русских/узбекских названий категорий на ключи словаря
+  static const Map<String, String> _categoryKeyMap = {
+    // Russian
+    'продукты': 'cat_food',
+    'транспорт': 'cat_transport',
+    'кафе и рестораны': 'cat_cafe',
+    'кафе_и_рестораны': 'cat_cafe',
+    'развлечения': 'cat_entertainment',
+    'здоровье': 'cat_health',
+    'одежда': 'cat_clothes',
+    'коммунальные': 'cat_utilities',
+    'другое': 'cat_other',
+    'зарплата': 'cat_salary',
+    'подработка': 'cat_work',
+    // English (already correct keys)
+    'food': 'cat_food',
+    'transport': 'cat_transport',
+    'cafe': 'cat_cafe',
+    'cafe & restaurants': 'cat_cafe',
+    'entertainment': 'cat_entertainment',
+    'health': 'cat_health',
+    'clothes': 'cat_clothes',
+    'utilities': 'cat_utilities',
+    'other': 'cat_other',
+    'salary': 'cat_salary',
+    'side job': 'cat_work',
+    // Uzbek
+    'oziq-ovqat': 'cat_food',
+    'kafe va restoranlar': 'cat_cafe',
+    'ko\'ngilochar': 'cat_entertainment',
+    'salomatlik': 'cat_health',
+    'kiyimlar': 'cat_clothes',
+    'kommunal': 'cat_utilities',
+    'boshqa': 'cat_other',
+    'oylik': 'cat_salary',
+    'qo\'shimcha ish': 'cat_work',
+  };
+
   String translateCategory(String category, String fallback) {
-    final key = 'cat_${category.toLowerCase().replaceAll(' ', '_')}';
-    return t(key);
+    final normalized = category.toLowerCase().trim();
+    // 1. Пробуем напрямую как ключ иконки: cat_food, cat_transport и т.д.
+    final iconKey = 'cat_$normalized';
+    final iconResult = t(iconKey);
+    if (iconResult != iconKey) return iconResult;
+
+    // 2. Пробуем маппинг русских/узбекских названий на ключи
+    final mappedKey = _categoryKeyMap[normalized];
+    if (mappedKey != null) {
+      final translated = t(mappedKey);
+      if (translated != mappedKey) return translated;
+    }
+
+    // 3. Возвращаем оригинальное имя категории (пользовательская категория)
+    return category;
   }
 }

@@ -66,30 +66,6 @@ class ApiService {
     return data;
   }
 
-  static Future<bool> checkLoginAvailable(String login) async {
-    if (login.isEmpty) return false;
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/auth/check-login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'login': login}),
-      ).timeout(timeoutDuration);
-      
-      final data = _decode(res);
-      
-      debugPrint('Check login response: status=${res.statusCode}, data=$data');
-      
-      // Both 200 and 409 return available field
-      if (res.statusCode == 200 || res.statusCode == 409) {
-        return data['available'] == true;
-      }
-      return false;
-    } catch (e) {
-      debugPrint('Check login error: $e');
-      return false;
-    }
-  }
-
   // ── Accounts ──
   Future<List<AccountModel>> fetchAccounts() async {
     final res = await http.get(Uri.parse('$baseUrl/accounts'), headers: _headers).timeout(timeoutDuration);

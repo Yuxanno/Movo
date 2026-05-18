@@ -34,72 +34,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _loading = false;
   String _error = '';
 
-  // Real-time login validation
-  bool _checkingLogin = false;
-  bool _loginAvailable = false;
-  bool _loginChecked = false;
-  Future<void>? _checkLoginFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _loginCtrl.addListener(_checkLoginAvailabilityDebounced);
-  }
-
   @override
   void dispose() {
-    _loginCtrl.removeListener(_checkLoginAvailabilityDebounced);
     _loginCtrl.dispose(); _passCtrl.dispose();
     _confirmCtrl.dispose(); _nameCtrl.dispose();
     super.dispose();
-  }
-
-  void _checkLoginAvailabilityDebounced() {
-    // Cancel previous check
-    _checkLoginFuture = null;
-    
-    // Schedule new check after 500ms
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        _checkLoginAvailability();
-      }
-    });
-  }
-
-  Future<void> _checkLoginAvailability() async {
-    final login = _loginCtrl.text.trim();
-    
-    if (login.isEmpty) {
-      setState(() {
-        _checkingLogin = false;
-        _loginAvailable = false;
-        _loginChecked = false;
-      });
-      return;
-    }
-
-    setState(() => _checkingLogin = true);
-    
-    try {
-      final available = await ApiService.checkLoginAvailable(login);
-      if (mounted) {
-        setState(() {
-          _checkingLogin = false;
-          _loginAvailable = available;
-          _loginChecked = true;
-        });
-      }
-    } catch (e) {
-      // On error (including CORS), assume login is available
-      // This allows user to proceed and get proper error from registration
-      if (mounted) {
-        setState(() {
-          _checkingLogin = false;
-          _loginAvailable = true;
-          _loginChecked = false;
-        });
-      }
-    }
   }
 
   Future<void> _handleNext() async {
@@ -114,10 +53,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
       if (_passCtrl.text != _confirmCtrl.text) {
         setState(() => _error = store.t('pass_mismatch')); return;
-      }
-      // If login was checked and not available, show error
-      if (_loginChecked && !_loginAvailable) {
-        setState(() => _error = 'Логин уже занят'); return;
       }
       setState(() => _step = 1);
     } else if (_step == 1) {
@@ -270,33 +205,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 4),
           Text(store.t('create_account_desc'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
           const SizedBox(height: 20),
-          Stack(
-            children: [
-              _InputField(controller: _loginCtrl, hint: store.t('login_hint'), icon: Icons.person_outline, action: TextInputAction.next),
-              Positioned(
-                right: 14,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: _checkingLogin
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF16a34a)))
-                      : _loginChecked && !_loginAvailable
-                          ? const Icon(
-                              Icons.cancel,
-                              color: Color(0xFFef4444),
-                              size: 20,
-                            )
-                          : _loginChecked && _loginAvailable
-                              ? const Icon(
-                                  Icons.check_circle,
-                                  color: Color(0xFF16a34a),
-                                  size: 20,
-                                )
-                              : const SizedBox.shrink(),
-                ),
-              ),
-            ],
-          ),
+          _InputField(controller: _loginCtrl, hint: store.t('login_hint'), icon: Icons.person_outline, action: TextInputAction.next),
           const SizedBox(height: 10),
           _InputField(
             controller: _passCtrl, hint: store.t('pass_hint_reg'),
@@ -528,7 +437,7 @@ class _InputField extends StatelessWidget {
             hintText: hint,
             hintStyle: const TextStyle(color: Color(0xFF9ca3af), fontSize: 14),
             border: InputBorder.none, isDense: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
           ),
           style: const TextStyle(fontSize: 14, color: Color(0xFF1f2937)),
         )),
