@@ -5,6 +5,7 @@ import 'api_service.dart';
 import 'models/account_model.dart';
 import 'models/transaction_model.dart';
 import 'models/category_model.dart';
+import '../core/app_snackbar.dart';
 
 class AppStore extends ChangeNotifier {
   final ApiService _api = ApiService();
@@ -17,8 +18,13 @@ class AppStore extends ChangeNotifier {
   List<CategoryModel> categories = [];
   Map<String, double> rates = {'UZS': 1, 'USD': 12700, 'RUB': 140};
   bool loading = false;
-  
-  // Localization
+
+  // ── Ключи SharedPreferences ──────────────────────────────────────────
+  static const _keyUser  = 'movo_user';
+  static const _keyToken = 'movo_token'; // JWT хранится отдельно от данных пользователя
+  static const _keyLang  = 'lang';
+
+  // ── Локализация ───────────────────────────────────────────────────────
   String lang = 'ru';
   final Map<String, Map<String, String>> _translations = {
     'ru': {
@@ -157,24 +163,59 @@ class AppStore extends ChangeNotifier {
 
   String t(String key) => _translations[lang]?[key] ?? key;
 
+  // ── Токен ─────────────────────────────────────────────────────────────
+
+  /// Восстанавливает токен при старте приложения (токен уже прочитан из prefs в main).
+  /// В отличие от saveToken — не пишет в SharedPreferences повторно.
+  void restoreToken(String token) {
+    _api.setToken(token);
+  }
+
+  /// Сохраняет JWT в SharedPreferences и сразу передаёт его в ApiService.
+  /// Вызывается после успешного login/register.
+  Future<void> saveToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyToken, token);
+    _api.setToken(token);
+  }
+
+  /// Читает JWT из SharedPreferences (при старте приложения).
+  /// Возвращает null если токена нет — запросы пройдут без Authorization.
+  static Future<String?> loadTokenFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyToken);
+  }
+
+  /// Стирает JWT при выходе. После этого ApiService тоже теряет токен.
+  Future<void> _clearToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyToken);
+    _api.setToken(null);
+  }
+
+  // ── Язык ──────────────────────────────────────────────────────────────
+
   Future<void> setLanguage(String l) async {
     lang = l;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('lang', l);
+    await prefs.setString(_keyLang, l);
     notifyListeners();
   }
 
   Future<void> loadLanguage() async {
     final prefs = await SharedPreferences.getInstance();
-    lang = prefs.getString('lang') ?? 'ru';
+    lang = prefs.getString(_keyLang) ?? 'ru';
     notifyListeners();
   }
 
+  // ── Пользователь ──────────────────────────────────────────────────────
+
+  /// Устанавливает данные текущего пользователя в памяти.
+  /// Больше не вызывает setUserId — идентификация теперь через JWT.
   void setUser(String? id, {String? name, String? login}) {
     userId = id;
     userName = name;
     userLogin = login;
-    _api.setUserId(id);
     if (id == null) {
       accounts = [];
       transactions = [];
@@ -183,21 +224,23 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Сохраняет профиль пользователя (без токена — токен хранится отдельно).
   Future<void> saveUserToPrefs(Map<String, dynamic> data) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('movo_user', jsonEncode(data));
+    await prefs.setString(_keyUser, jsonEncode(data));
   }
 
   static Future<Map<String, dynamic>?> loadUserFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('movo_user');
+    final raw = prefs.getString(_keyUser);
     if (raw == null) return null;
     try { return jsonDecode(raw) as Map<String, dynamic>; } catch (_) { return null; }
   }
 
   Future<void> logout() async {
+    await _clearToken();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('movo_user');
+    await prefs.remove(_keyUser);
     setUser(null);
   }
 
@@ -225,6 +268,8 @@ class AppStore extends ChangeNotifier {
       accounts = await _api.fetchAccounts();
     } catch (e) {
       debugPrint('fetchAccounts error: $e');
+      // Вариант Б: нет context — показываем через глобальный scaffoldMessengerKey
+      AppSnackBar.error(message: AppSnackBar.messageFromError(e));
     }
     loading = false;
     notifyListeners();
@@ -233,11 +278,27 @@ class AppStore extends ChangeNotifier {
   Future<void> fetchTransactions({String? accountId}) async {
     if (userId == null) return;
     try {
+      // Всегда полная перезапись — никакого addAll, дублирование невозможно
       transactions = await _api.fetchTransactions(accountId: accountId);
     } catch (e) {
       debugPrint('fetchTransactions error: $e');
+      AppSnackBar.error(message: AppSnackBar.messageFromError(e));
     }
     notifyListeners();
+  }
+
+  /// Загружает транзакции конкретного счёта изолированно —
+  /// НЕ перезаписывает store.transactions, возвращает список напрямую.
+  /// Используется в _AccountDetail чтобы не ломать глобальный кэш дашборда.
+  Future<List<TransactionModel>> fetchTransactionsForAccount(String accountId) async {
+    if (userId == null) return [];
+    try {
+      return await _api.fetchTransactions(accountId: accountId);
+    } catch (e) {
+      debugPrint('fetchTransactionsForAccount error: $e');
+      AppSnackBar.error(message: AppSnackBar.messageFromError(e));
+      return [];
+    }
   }
 
   Future<void> fetchCategories() async {
@@ -246,6 +307,7 @@ class AppStore extends ChangeNotifier {
       categories = await _api.fetchCategories();
     } catch (e) {
       debugPrint('fetchCategories error: $e');
+      AppSnackBar.error(message: AppSnackBar.messageFromError(e));
     }
     notifyListeners();
   }
@@ -255,6 +317,8 @@ class AppStore extends ChangeNotifier {
       rates = await _api.fetchRates();
     } catch (e) {
       debugPrint('fetchRates error: $e');
+      // Курсы — некритичная ошибка, фолбэк-значения уже прописаны в полях класса.
+      // Тихо логируем, пользователя не беспокоим.
     }
     notifyListeners();
   }
@@ -266,6 +330,7 @@ class AppStore extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('addAccount error: $e');
+      AppSnackBar.error(message: AppSnackBar.messageFromError(e));
     }
   }
 
@@ -276,6 +341,7 @@ class AppStore extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('deleteAccount error: $e');
+      AppSnackBar.error(message: AppSnackBar.messageFromError(e));
     }
   }
 
@@ -295,9 +361,13 @@ class AppStore extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('addTransaction error: $e');
+      AppSnackBar.error(message: AppSnackBar.messageFromError(e));
     }
   }
 
+  /// deleteTransaction бросает исключение наружу (rethrow),
+  /// чтобы UI-вызывающий код (Вариант А) мог показать свой SnackBar
+  /// с учётом контекста (например, закрыть диалог перед показом).
   Future<void> deleteTransaction(String id) async {
     try {
       final tx = transactions.firstWhere((t) => t.id == id);
@@ -316,7 +386,7 @@ class AppStore extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('deleteTransaction error: $e');
-      rethrow;
+      rethrow; // UI поймает и покажет SnackBar через Вариант А
     }
   }
 
@@ -327,6 +397,7 @@ class AppStore extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('addCategory error: $e');
+      AppSnackBar.error(message: AppSnackBar.messageFromError(e));
     }
   }
 
@@ -337,6 +408,7 @@ class AppStore extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('deleteCategory error: $e');
+      AppSnackBar.error(message: AppSnackBar.messageFromError(e));
     }
   }
 

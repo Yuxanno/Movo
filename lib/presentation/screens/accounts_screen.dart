@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/app_store.dart';
 import '../../data/models/account_model.dart';
+import '../../data/models/transaction_model.dart';
 import '../../core/utils/helpers.dart';
 
 const _colors = ['#22c55e', '#6366f1', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
@@ -30,8 +31,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
     setState(() => _saving = true);
     final store = context.read<AppStore>();
     final color = _colors[store.accounts.length % _colors.length];
+    // addAccount уже делает insert(0, account) локально — fetchAccounts не нужен,
+    // иначе счёт появится дважды (локально + из ответа сервера)
     await store.addAccount({'name': _name, 'icon': _icon, 'color': color, 'balance': 0, 'currency': _currency, 'isShared': false});
-    await store.fetchAccounts();
     setState(() { _name = ''; _icon = 'card'; _currency = 'UZS'; _showForm = false; _saving = false; });
   }
 
@@ -170,117 +172,137 @@ class _AccountDetail extends StatefulWidget {
 
 class _AccountDetailState extends State<_AccountDetail> {
   String _filter = 'all';
+  // Собственный изолированный список — не мутирует store.transactions
+  List<TransactionModel> _localTxs = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    context.read<AppStore>().fetchTransactions(accountId: widget.account.id);
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    final store = context.read<AppStore>();
+    // fetchTransactionsForAccount — изолированный метод, не трогает store.transactions
+    final txs = await store.fetchTransactionsForAccount(widget.account.id);
+    if (!mounted) return;
+    setState(() { _localTxs = txs; _loading = false; });
   }
 
   @override
   Widget build(BuildContext context) {
     final store = context.watch<AppStore>();
     final color = parseColor(widget.account.color);
-    final txs = store.transactions
-        .where((t) => t.accountId == widget.account.id)
+
+    final txs = _localTxs
         .where((t) => _filter == 'all' || t.type == _filter)
         .toList();
-    final income = store.transactions.where((t) => t.accountId == widget.account.id && t.type == 'income').fold<double>(0, (s, t) => s + t.amount);
-    final expense = store.transactions.where((t) => t.accountId == widget.account.id && t.type == 'expense').fold<double>(0, (s, t) => s + t.amount);
+    final income  = _localTxs.where((t) => t.type == 'income') .fold<double>(0, (s, t) => s + t.amount);
+    final expense = _localTxs.where((t) => t.type == 'expense').fold<double>(0, (s, t) => s + t.amount);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F7F4),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            GestureDetector(
-              onTap: widget.onBack,
-              child: Row(children: [
-                const Icon(Icons.arrow_back, size: 18, color: Color(0xFF6b7280)),
-                const SizedBox(width: 8),
-                Text(store.t('back_btn'), style: const TextStyle(fontSize: 14, color: Color(0xFF6b7280))),
-              ]),
-            ),
-            const SizedBox(height: 16),
-            // Account card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(gradient: LinearGradient(colors: [color.withAlpha(238), color.withAlpha(153)]), borderRadius: BorderRadius.circular(16)),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.white.withAlpha(51), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.credit_card, color: Colors.white, size: 16)),
+        child: RefreshIndicator(
+          color: const Color(0xFF16a34a),
+          onRefresh: _load, // Pull-to-refresh перезагружает только этот счёт
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              GestureDetector(
+                onTap: widget.onBack,
+                child: Row(children: [
+                  const Icon(Icons.arrow_back, size: 18, color: Color(0xFF6b7280)),
                   const SizedBox(width: 8),
-                  Text(widget.account.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                  Text(store.t('back_btn'), style: const TextStyle(fontSize: 14, color: Color(0xFF6b7280))),
                 ]),
-                const SizedBox(height: 12),
-                RichText(text: TextSpan(children: [
-                  TextSpan(text: formatAmount(widget.account.balance), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-                  TextSpan(text: ' ${widget.account.currency}', style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(179))),
-                ])),
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(color: Colors.white.withAlpha(38), borderRadius: BorderRadius.circular(12)),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(store.t('income'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
-                      Text('+${formatAmount(income)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
-                    ]),
-                  )),
-                  const SizedBox(width: 12),
-                  Expanded(child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(color: Colors.white.withAlpha(38), borderRadius: BorderRadius.circular(12)),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(store.t('expense'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
-                      Text('−${formatAmount(expense)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
-                    ]),
-                  )),
-                ]),
-              ]),
-            ),
-            const SizedBox(height: 16),
-            // Filter tabs
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8)]),
-              child: Row(children: [
-                for (final f in [['all', store.t('all')], ['income', store.t('income')], ['expense', store.t('expense')]])
-                  Expanded(child: GestureDetector(
-                    onTap: () => setState(() => _filter = f[0]),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(color: _filter == f[0] ? const Color(0xFF16a34a) : Colors.transparent, borderRadius: BorderRadius.circular(8)),
-                      child: Text(f[1], textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _filter == f[0] ? Colors.white : const Color(0xFF6b7280))),
-                    ),
-                  )),
-              ]),
-            ),
-            const SizedBox(height: 16),
-            if (txs.isEmpty)
-              Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 48), child: Text(store.t('no_txs'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af)))))
-            else
-              ...txs.map((t) {
-                final isIncome = t.type == 'income';
-                final txColor = isIncome ? const Color(0xFF22c55e) : const Color(0xFFef4444);
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                  child: Row(children: [
-                    Container(width: 36, height: 36, decoration: BoxDecoration(color: txColor.withAlpha(34), borderRadius: BorderRadius.circular(10)),
-                      child: Icon(isIncome ? Icons.trending_up : Icons.trending_down, color: txColor, size: 16)),
-                    const SizedBox(width: 10),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(t.description.isNotEmpty ? t.description : t.category, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1f2937))),
-                      Text('${formatDate(t.date)} · ${t.category}', style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
-                    ])),
-                    Text('${isIncome ? "+" : "−"}${formatAmount(t.amount)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: txColor)),
+              ),
+              const SizedBox(height: 16),
+              // Account card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(gradient: LinearGradient(colors: [color.withAlpha(238), color.withAlpha(153)]), borderRadius: BorderRadius.circular(16)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.white.withAlpha(51), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.credit_card, color: Colors.white, size: 16)),
+                    const SizedBox(width: 8),
+                    Text(widget.account.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                   ]),
-                );
-              }),
-          ]),
+                  const SizedBox(height: 12),
+                  RichText(text: TextSpan(children: [
+                    TextSpan(text: formatAmount(widget.account.balance), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                    TextSpan(text: ' ${widget.account.currency}', style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(179))),
+                  ])),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(color: Colors.white.withAlpha(38), borderRadius: BorderRadius.circular(12)),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(store.t('income'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
+                        Text('+${formatAmount(income)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                      ]),
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(color: Colors.white.withAlpha(38), borderRadius: BorderRadius.circular(12)),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(store.t('expense'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
+                        Text('−${formatAmount(expense)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                      ]),
+                    )),
+                  ]),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              // Filter tabs
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8)]),
+                child: Row(children: [
+                  for (final f in [['all', store.t('all')], ['income', store.t('income')], ['expense', store.t('expense')]])
+                    Expanded(child: GestureDetector(
+                      onTap: () => setState(() => _filter = f[0]),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(color: _filter == f[0] ? const Color(0xFF16a34a) : Colors.transparent, borderRadius: BorderRadius.circular(8)),
+                        child: Text(f[1], textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _filter == f[0] ? Colors.white : const Color(0xFF6b7280))),
+                      ),
+                    )),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              if (_loading)
+                const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 48), child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF16a34a))))
+              else if (txs.isEmpty)
+                Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 48), child: Text(store.t('no_txs'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af)))))
+              else
+                ...txs.map((t) {
+                  final isIncome = t.type == 'income';
+                  final txColor = isIncome ? const Color(0xFF22c55e) : const Color(0xFFef4444);
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                    child: Row(children: [
+                      Container(width: 36, height: 36, decoration: BoxDecoration(color: txColor.withAlpha(34), borderRadius: BorderRadius.circular(10)),
+                        child: Icon(isIncome ? Icons.trending_up : Icons.trending_down, color: txColor, size: 16)),
+                      const SizedBox(width: 10),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(t.description.isNotEmpty ? t.description : t.category, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1f2937))),
+                        Text('${formatDate(t.date)} · ${t.category}', style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
+                      ])),
+                      Text('${isIncome ? "+" : "−"}${formatAmount(t.amount)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: txColor)),
+                    ]),
+                  );
+                }),
+            ]),
+          ),
         ),
       ),
     );

@@ -40,6 +40,9 @@ class _LoginScreenState extends State<LoginScreen> {
       final store = context.read<AppStore>();
       store.setUser(data['_id'] as String, name: data['name'] as String?, login: data['login'] as String?);
       await store.saveUserToPrefs(data);
+      // Сохраняем JWT — все последующие запросы пойдут с Authorization: Bearer
+      final token = data['token'] as String?;
+      if (token != null && token.isNotEmpty) await store.saveToken(token);
       await store.fetchAccounts();
       await store.fetchTransactions();
       await store.fetchCategories();

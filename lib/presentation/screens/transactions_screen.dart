@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../data/app_store.dart';
 import '../../data/models/transaction_model.dart';
 import '../../core/utils/helpers.dart';
+import '../../core/app_snackbar.dart';
 
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({Key? key}) : super(key: key);
@@ -14,16 +15,29 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   String _search = '';
   String? _confirmId;
   bool _deleting = false;
+  // Флаг предотвращает повторный fetch при горячей перезагрузке или rebuild initState
+  bool _fetched = false;
   final _searchCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_fetched) return;
+      _fetched = true;
       final store = context.read<AppStore>();
       store.fetchTransactions();
       store.fetchCategories();
     });
+  }
+
+  Future<void> _refresh() async {
+    // Pull-to-refresh: полная перезагрузка с сервера, старый кэш заменяется
+    final store = context.read<AppStore>();
+    await Future.wait([
+      store.fetchTransactions(),
+      store.fetchCategories(),
+    ]);
   }
 
   @override
@@ -48,8 +62,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       await context.read<AppStore>().deleteTransaction(id);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: const Color(0xFFef4444)),
+        // Вариант А: есть context — ScaffoldMessenger привязан к этому экрану.
+        // messageFromError переводит любое исключение в читаемый текст.
+        AppSnackBar.error(
+          context: context,
+          message: AppSnackBar.messageFromError(e),
         );
       }
     } finally {
@@ -151,16 +168,27 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               ),
               // List
               Expanded(
-                child: filtered.isEmpty
-                    ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.filter_list, size: 40, color: Color(0xFFe5e7eb)),
-                        const SizedBox(height: 8),
-                        Text(store.t('no_txs'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
-                      ]))
+                child: RefreshIndicator(
+                  color: const Color(0xFF16a34a),
+                  onRefresh: _refresh,
+                  child: filtered.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [Center(child: Padding(
+                          padding: const EdgeInsets.only(top: 80),
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.filter_list, size: 40, color: Color(0xFFe5e7eb)),
+                            const SizedBox(height: 8),
+                            Text(store.t('no_txs'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
+                          ]),
+                        ))],
+                      )
                     : ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                         children: grouped.entries.map((entry) => _buildGroup(entry.key, entry.value, store)).toList(),
                       ),
+                ),
               ),
             ],
           ),

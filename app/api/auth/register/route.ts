@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
+import bcrypt from "bcryptjs"
 import { connectDB } from "@/lib/db"
 import { User } from "@/lib/models/User"
 import { Category } from "@/lib/models/Category"
+import { signToken } from "@/lib/auth"
 
 const DEFAULT_CATEGORIES = [
   { name: "Продукты",      icon: "food",          color: "#22c55e", type: "expense" },
@@ -23,9 +25,24 @@ export async function POST(req: Request) {
     if (!login || !password) return NextResponse.json({ error: "Заполните все поля" }, { status: 400 })
     const exists = await User.findOne({ login })
     if (exists) return NextResponse.json({ error: "Логин уже занят" }, { status: 409 })
-    const user = await User.create({ login, password, name, currency })
+
+    // Хешируем пароль перед сохранением.
+    // cost factor 10 — стандартный баланс безопасности и скорости (~100ms на сервере).
+    // В MongoDB будет храниться хеш вида: $2a$10$...
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    const user = await User.create({ login, password: hashedPassword, name, currency })
     await Category.insertMany(DEFAULT_CATEGORIES.map(c => ({ ...c, userId: user._id.toString() })))
-    return NextResponse.json({ _id: user._id, login: user.login, name: user.name, currency: user.currency }, { status: 201 })
+
+    const token = signToken(user._id.toString())
+
+    return NextResponse.json({
+      _id: user._id,
+      login: user.login,
+      name: user.name,
+      currency: user.currency,
+      token,
+    }, { status: 201 })
   } catch {
     return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 })
   }

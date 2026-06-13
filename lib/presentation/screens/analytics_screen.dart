@@ -12,35 +12,66 @@ class AnalyticsScreen extends StatefulWidget {
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   String _period = 'month';
 
-  @override
-  void initState() {
-    super.initState();
+  /// Возвращает начало периода для фильтрации транзакций.
+  /// Использует конструктор DateTime с «переполнением» месяца — Dart сам
+  /// нормализует значения (например, month=0 → декабрь прошлого года).
+  DateTime _periodStart(DateTime now) {
+    switch (_period) {
+      case 'month':
+        // Начало текущего месяца: 1-е число, 00:00:00
+        return DateTime(now.year, now.month, 1);
+      case '3m':
+        // Ровно 3 месяца назад, начало того месяца
+        return DateTime(now.year, now.month - 2, 1);
+      case 'year':
+        // Начало текущего года
+        return DateTime(now.year, 1, 1);
+      default:
+        return DateTime(now.year, now.month, 1);
+    }
+  }
+
+  /// Возвращает точный диапазон (start, end) для конкретного месяца
+  /// по смещению [monthOffset] от [base] (0 = текущий, -1 = прошлый и т.д.).
+  /// DateTime с month=0 → декабрь прошлого года — Dart обрабатывает автоматически.
+  ({DateTime start, DateTime end}) _monthRange(DateTime base, int monthOffset) {
+    final year = base.year;
+    final month = base.month + monthOffset; // может быть 0 или отрицательным — ОК
+    final start = DateTime(year, month, 1);
+    // month+1, день 0 = последний день месяца; устанавливаем 23:59:59
+    final end = DateTime(year, month + 1, 1).subtract(const Duration(seconds: 1));
+    return (start: start, end: end);
   }
 
   @override
   Widget build(BuildContext context) {
     final store = context.watch<AppStore>();
     final now = DateTime.now();
-    DateTime periodStart;
-    if (_period == 'month') { periodStart = DateTime(now.year, now.month - 1, now.day); }
-    else if (_period == '3m') { periodStart = DateTime(now.year, now.month - 3, now.day); }
-    else { periodStart = DateTime(now.year - 1, now.month, now.day); }
 
-    final filtered = store.transactions.where((t) => t.date.isAfter(periodStart)).toList();
+    final periodStart = _periodStart(now);
+    final filtered = store.transactions.where((t) => !t.date.isBefore(periodStart)).toList();
     final expenses = filtered.where((t) => t.type == 'expense').toList();
     final incomes = filtered.where((t) => t.type == 'income').toList();
     final totalIncome = incomes.fold<double>(0, (s, t) => s + t.amount);
     final totalExpense = expenses.fold<double>(0, (s, t) => s + t.amount);
     final balance = totalIncome - totalExpense;
 
-    // Monthly bars (last 6)
+    // Monthly bars (last 6 months) — смещения: -5, -4, -3, -2, -1, 0
     final monthlyIncome = List.generate(6, (i) {
-      final m = (now.month - 5 + i - 1 + 12) % 12;
-      return store.transactions.where((t) => t.type == 'income' && t.date.month == m + 1).fold<double>(0, (s, t) => s + t.amount);
+      final range = _monthRange(now, i - 5);
+      return store.transactions
+          .where((t) => t.type == 'income' &&
+              !t.date.isBefore(range.start) &&
+              !t.date.isAfter(range.end))
+          .fold<double>(0, (s, t) => s + t.amount);
     });
     final monthlyExpense = List.generate(6, (i) {
-      final m = (now.month - 5 + i - 1 + 12) % 12;
-      return store.transactions.where((t) => t.type == 'expense' && t.date.month == m + 1).fold<double>(0, (s, t) => s + t.amount);
+      final range = _monthRange(now, i - 5);
+      return store.transactions
+          .where((t) => t.type == 'expense' &&
+              !t.date.isBefore(range.start) &&
+              !t.date.isAfter(range.end))
+          .fold<double>(0, (s, t) => s + t.amount);
     });
 
     // Category breakdown
@@ -140,7 +171,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ]),
                 ]),
                 const SizedBox(height: 10),
-                SizedBox(height: 112, child: CustomPaint(size: const Size(double.infinity, 112), painter: _BarChartPainter(monthlyIncome, monthlyExpense, now.month, store))),
+                SizedBox(height: 112, child: CustomPaint(size: const Size(double.infinity, 112), painter: _BarChartPainter(
+                  monthlyIncome,
+                  monthlyExpense,
+                  // Реальные номера месяцев (1–12) для 6 столбцов через DateTime-нормализацию
+                  List.generate(6, (i) => DateTime(now.year, now.month + (i - 5)).month),
+                  store,
+                ))),
               ]),
             ),
             const SizedBox(height: 14),
@@ -186,15 +223,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
 class _BarChartPainter extends CustomPainter {
   final List<double> income, expense;
-  final int currentMonth;
+  /// Реальные номера месяцев (1–12) для каждого из 6 столбцов,
+  /// вычисленные через DateTime чтобы корректно пересекать год.
+  final List<int> monthNumbers;
   final AppStore store;
-  _BarChartPainter(this.income, this.expense, this.currentMonth, this.store);
+  _BarChartPainter(this.income, this.expense, this.monthNumbers, this.store);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final maxVal = [
-      ...income, ...expense, 1.0
-    ].reduce((a, b) => a > b ? a : b);
+    final maxVal = [...income, ...expense, 1.0].reduce((a, b) => a > b ? a : b);
     final barAreaH = size.height - 16;
     final barW = size.width / 6;
 
@@ -214,10 +251,12 @@ class _BarChartPainter extends CustomPainter {
       final expPaint = Paint()..color = isNow ? const Color(0xFFef4444) : const Color(0xFFef4444).withAlpha(68);
       canvas.drawRRect(RRect.fromLTRBR(x + gapW * 2 + halfW, barAreaH - expH, x + gapW * 2 + halfW * 2, barAreaH, const Radius.circular(2)), expPaint);
 
-      // Month label
-      final mIdx = (currentMonth - 6 + i + 12) % 12;
-      final label = store.t('ms${mIdx + 1}');
-      final tp = TextPainter(text: TextSpan(text: label, style: TextStyle(fontSize: 9, color: isNow ? const Color(0xFF374151) : const Color(0xFF9ca3af), fontWeight: isNow ? FontWeight.w600 : FontWeight.normal)), textDirection: TextDirection.ltr)..layout();
+      // Month label — используем реальный номер месяца (1-based)
+      final label = store.t('ms${monthNumbers[i]}');
+      final tp = TextPainter(
+        text: TextSpan(text: label, style: TextStyle(fontSize: 9, color: isNow ? const Color(0xFF374151) : const Color(0xFF9ca3af), fontWeight: isNow ? FontWeight.w600 : FontWeight.normal)),
+        textDirection: TextDirection.ltr,
+      )..layout();
       tp.paint(canvas, Offset(x + barW / 2 - tp.width / 2, size.height - 14));
     }
   }

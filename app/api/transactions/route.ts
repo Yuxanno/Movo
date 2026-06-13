@@ -2,11 +2,12 @@ import { NextResponse } from "next/server"
 import { connectDB } from "@/lib/db"
 import { Transaction } from "@/lib/models/Transaction"
 import { Account } from "@/lib/models/Account"
+import { getUserIdFromRequest } from "@/lib/auth"
 
 export async function GET(req: Request) {
   try {
     await connectDB()
-    const userId = req.headers.get("x-user-id")
+    const userId = getUserIdFromRequest(req)
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const { searchParams } = new URL(req.url)
     const accountId = searchParams.get("accountId")
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await connectDB()
-    const userId = req.headers.get("x-user-id")
+    const userId = getUserIdFromRequest(req)
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const body = await req.json()
     const tx = await Transaction.create({ ...body, userId })

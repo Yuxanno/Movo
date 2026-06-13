@@ -4,7 +4,6 @@ import '../../data/app_store.dart';
 import '../../data/models/account_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../core/utils/helpers.dart';
-import '../widgets/currency_calculator.dart';
 import 'receipt_scanner_sheet.dart';
 import 'transactions_screen.dart';
 
@@ -18,9 +17,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final PageController _pageCtrl = PageController(viewportFraction: 0.82);
   int _activePage = 0;
 
-  @override
-  void initState() {
-    super.initState();
+  /// Возвращает строго List<double> длиной 7 — суммы расходов/доходов
+  /// за каждый из последних 7 дней (индекс 0 = 6 дней назад, индекс 6 = сегодня).
+  /// Дни без транзакций → 0.0. Тип [txType]: 'income' или 'expense'.
+  List<double> _last7DaysAmounts(List<TransactionModel> txs, String txType) {
+    final now = DateTime.now();
+    // Опорная точка — начало сегодняшнего дня
+    final today = DateTime(now.year, now.month, now.day);
+
+    return List.generate(7, (i) {
+      // i=0 → 6 дней назад, i=6 → сегодня
+      final dayStart = today.subtract(Duration(days: 6 - i));
+      final dayEnd = dayStart.add(const Duration(days: 1)); // не включая
+      return txs
+          .where((t) =>
+              t.type == txType &&
+              !t.date.isBefore(dayStart) &&
+              t.date.isBefore(dayEnd))
+          .fold<double>(0.0, (sum, t) => sum + t.amount);
+    });
   }
 
   @override
@@ -28,22 +43,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final store = context.watch<AppStore>();
     return Scaffold(
       backgroundColor: const Color(0xFFF0F7F4),
-      body: CustomScrollView(
-        slivers: [
-          // ── Header ──
-          SliverToBoxAdapter(child: _buildHeader(store)),
-          // ── Bank Cards Carousel ──
-          SliverToBoxAdapter(child: _buildCarousel(store)),
-          // ── Month Overview ──
-          SliverToBoxAdapter(child: _buildMonthOverview(store)),
-          // ── Quick Actions ──
-          SliverToBoxAdapter(child: _buildQuickActions(store)),
-          // ── Balance Chart ──
-          SliverToBoxAdapter(child: _buildBalanceChart(store)),
-          // ── Recent Transactions ──
-          SliverToBoxAdapter(child: _buildRecentTransactions(store)),
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
-        ],
+      body: RefreshIndicator(
+        color: const Color(0xFF16a34a),
+        onRefresh: () async {
+          await Future.wait([
+            store.fetchAccounts(),
+            store.fetchTransactions(),
+          ]);
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            // ── Header ──
+            SliverToBoxAdapter(child: _buildHeader(store)),
+            // ── Bank Cards Carousel ──
+            SliverToBoxAdapter(child: _buildCarousel(store)),
+            // ── Month Overview ──
+            SliverToBoxAdapter(child: _buildMonthOverview(store)),
+            // ── Quick Actions ──
+            SliverToBoxAdapter(child: _buildQuickActions(store)),
+            // ── Balance Chart ──
+            SliverToBoxAdapter(child: _buildBalanceChart(store)),
+            // ── Recent Transactions ──
+            SliverToBoxAdapter(child: _buildRecentTransactions(store)),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
+        ),
       ),
     );
   }
@@ -159,6 +184,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildMonthOverview(AppStore store) {
+    final incomeData  = _last7DaysAmounts(store.transactions, 'income');
+    final expenseData = _last7DaysAmounts(store.transactions, 'expense');
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: Container(
@@ -176,7 +203,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(children: [
                   Text(formatAmount(store.monthlyIncome), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
                   const SizedBox(width: 8),
-                  _SparkLine(color: const Color(0xFF22c55e)),
+                  _SparkLine(color: const Color(0xFF22c55e), data: incomeData),
                 ]),
               ])),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -185,7 +212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(children: [
                   Text(formatAmount(store.monthlyExpense), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
                   const SizedBox(width: 8),
-                  _SparkLine(color: const Color(0xFFf97316)),
+                  _SparkLine(color: const Color(0xFFf97316), data: expenseData),
                 ]),
               ])),
             ]),
@@ -404,30 +431,51 @@ class _TransactionRow extends StatelessWidget {
 // ── SparkLine ──
 class _SparkLine extends StatelessWidget {
   final Color color;
-  const _SparkLine({required this.color});
+  /// Список из 7 значений (суммы за каждый день).
+  /// Нули допустимы — painter обработает их корректно.
+  final List<double> data;
+  const _SparkLine({required this.color, required this.data});
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(size: const Size(60, 24), painter: _SparkPainter(color));
+    return CustomPaint(size: const Size(60, 24), painter: _SparkPainter(color, data));
   }
 }
 
 class _SparkPainter extends CustomPainter {
   final Color color;
-  _SparkPainter(this.color);
+  final List<double> data;
+  const _SparkPainter(this.color, this.data);
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color..strokeWidth = 2..style = PaintingStyle.stroke..strokeCap = StrokeCap.round;
-    final data = [40, 55, 45, 60, 70, 65, 80];
+    if (data.isEmpty) return;
+
+    // Нормализация: находим максимум и масштабируем все точки под высоту холста.
+    // Если все значения нулевые — рисуем плоскую линию по центру (нет деления на 0).
+    final maxVal = data.reduce((a, b) => a > b ? a : b);
+    final effectiveMax = maxVal > 0 ? maxVal : 1.0;
+
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
     final path = Path();
     for (int i = 0; i < data.length; i++) {
       final x = (i / (data.length - 1)) * size.width;
-      final y = size.height - (data[i] / 100) * size.height;
+      // Нормализованная Y: 0 внизу, max наверху; оставляем 1px отступ сверху/снизу
+      final normalized = data[i] / effectiveMax;
+      final y = (size.height - 2) - normalized * (size.height - 4) + 1;
       if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
     }
     canvas.drawPath(path, paint);
   }
+
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  // Перерисовываем только если данные реально изменились
+  bool shouldRepaint(_SparkPainter old) => old.data != data || old.color != color;
 }
 
 // ── Balance Chart Painter ──

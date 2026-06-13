@@ -1,29 +1,49 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'models/account_model.dart';
 import 'models/transaction_model.dart';
 import 'models/category_model.dart';
 
 class ApiService {
-  static String get baseUrl {
-    try {
-      return dotenv.env['API_BASE_URL'] ?? 'http://91.108.122.163:3000/api';
-    } catch (_) {
-      return 'http://91.108.122.163:3000/api';
-    }
-  }
-  String? _userId;
+  // URL бэкенда считывается из переменной компиляции --dart-define=API_BASE_URL=...
+  // Это безопасный механизм Flutter: значение встраивается на этапе сборки,
+  // не хранится в assets и не попадает в исходники или APK в открытом виде.
+  //
+  // Запуск для разработки (дефолт — localhost):
+  //   flutter run
+  //
+  // Сборка релиза с боевым сервером:
+  //   flutter build apk --dart-define=API_BASE_URL=http://91.108.122.163:3000/api
+  static const String _baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:3000/api',
+  );
 
-  void setUserId(String? id) => _userId = id;
+  // Таймаут в миллисекундах тоже можно переопределить при сборке:
+  //   --dart-define=API_TIMEOUT_MS=15000
+  static const int _timeoutMs = int.fromEnvironment(
+    'API_TIMEOUT_MS',
+    defaultValue: 30000,
+  );
 
+  static String get baseUrl => _baseUrl;
+  static Duration get timeoutDuration => Duration(milliseconds: _timeoutMs);
+
+  // Токен хранится в памяти процесса на время жизни AppStore.
+  // Персистентное хранение (SharedPreferences) — на стороне AppStore.
+  String? _token;
+
+  /// Вызывается из AppStore сразу после login/register и при восстановлении сессии.
+  void setToken(String? token) => _token = token;
+
+  /// Формирует заголовки запроса.
+  /// Если токен есть — добавляет стандартный Bearer-заголовок.
+  /// Если токена нет — заголовок Authorization просто отсутствует (не падает).
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
-    if (_userId != null) 'x-user-id': _userId!,
+    if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
   };
-
-  static Duration get timeoutDuration => Duration(milliseconds: int.tryParse(dotenv.env['API_TIMEOUT'] ?? '30000') ?? 30000);
 
   // Helper for UTF-8 decoding
   static dynamic _decode(http.Response res) {

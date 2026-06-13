@@ -8,19 +8,18 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'dart:async';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'data/app_store.dart';
 import 'presentation/screens/app_shell.dart';
 import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/pin_screen.dart';
 import 'core/ad_service.dart';
+import 'core/app_snackbar.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
   await initializeDateFormatting('ru', null);
   await initializeDateFormatting('en', null);
   await initializeDateFormatting('uz', null);
@@ -29,12 +28,15 @@ void main() async {
     await MobileAds.instance.initialize();
   }
   final savedUser = await AppStore.loadUserFromPrefs();
-  runApp(MovoApp(savedUser: savedUser));
+  // Восстанавливаем токен из хранилища — ApiService получит его до первого запроса
+  final savedToken = await AppStore.loadTokenFromPrefs();
+  runApp(MovoApp(savedUser: savedUser, savedToken: savedToken));
 }
 
 class MovoApp extends StatelessWidget {
   final Map<String, dynamic>? savedUser;
-  const MovoApp({Key? key, this.savedUser}) : super(key: key);
+  final String? savedToken;
+  const MovoApp({Key? key, this.savedUser, this.savedToken}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +49,8 @@ class MovoApp extends StatelessWidget {
             name: savedUser!['name'] as String?,
             login: savedUser!['login'] as String?,
           );
+          // Токен загружен до первого сетевого вызова — запросы сразу идут с Authorization
+          if (savedToken != null) store.restoreToken(savedToken!);
           Future.microtask(() {
             store.fetchAccounts();
             store.fetchTransactions();
@@ -58,6 +62,7 @@ class MovoApp extends StatelessWidget {
       },
       child: MaterialApp(
         navigatorKey: navigatorKey,
+        scaffoldMessengerKey: scaffoldMessengerKey, // Вариант Б: глобальный SnackBar из Store
         title: 'Movo',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(

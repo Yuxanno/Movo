@@ -17,7 +17,6 @@ dependencies:
 
   # Networking
   http: ^1.2.0
-  flutter_dotenv: ^6.0.1
   connectivity_plus: ^7.1.1
   app_settings: ^7.0.0
 
@@ -40,5 +39,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - .env
