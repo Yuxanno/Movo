@@ -7,9 +7,18 @@ __v0_jsx-dev-runtime.ts
 .vercel/
 next.user-config.*
 
-# Environment variables
+# Environment variables — никогда не коммитить реальные значения
 .env
+.env.local
+.env.development
+.env.production
+.env.staging
 .env*.local
+# Исключение: шаблон без секретов коммитить можно и нужно
+!.env.example
+
+# Dart build defines (секреты компиляции — не коммитить)
+dart_defines/
 
 # Common ignores
 node_modules/

@@ -1,0 +1,112 @@
+[
+  {
+    "id": 1,
+    "title": "Проанализировать проект и выявить проблемы",
+    "description": "Полный анализ кодовой базы, архитектуры, безопасности и функциональности",
+    "status": "completed",
+    "priority": "high",
+    "createdAt": "2026-07-10T11:25:00Z",
+    "completedAt": "2026-07-10T11:30:00Z",
+    "tags": ["analysis", "security", "architecture"]
+  },
+  {
+    "id": 2,
+    "title": "Создать систему памяти проекта",
+    "description": "Создать директорию и файлы для отслеживания задач, проблем и решений",
+    "status": "completed",
+    "priority": "high",
+    "createdAt": "2026-07-10T11:30:00Z",
+    "completedAt": "2026-07-10T11:35:00Z",
+    "tags": ["project-management", "docs"]
+  },
+  {
+    "id": 3,
+    "title": "Исправить хранение JWT в Flutter",
+    "description": "Перенести хранение JWT-токена из SharedPreferences в flutter_secure_storage",
+    "status": "completed",
+    "priority": "high",
+    "createdAt": "2026-07-10T11:30:00Z",
+    "completedAt": "2026-07-10T11:40:00Z",
+    "tags": ["security", "flutter", "android", "ios"]
+  },
+  {
+    "id": 4,
+    "title": "Добавить Zod-валидацию для accounts и categories",
+    "description": "Создать Zod-схемы и внедрить валидацию в API-роуты для счетов и категорий",
+    "status": "completed",
+    "priority": "high",
+    "createdAt": "2026-07-10T11:30:00Z",
+    "completedAt": "2026-07-10T11:50:00Z",
+    "tags": ["api", "validation", "security"]
+  },
+  {
+    "id": 5,
+    "title": "Добавить PATCH-роут для категорий",
+    "description": "Реализовать возможность обновления категорий через API",
+    "status": "completed",
+    "priority": "medium",
+    "createdAt": "2026-07-10T11:30:00Z",
+    "completedAt": "2026-07-10T11:50:00Z",
+    "tags": ["api", "feature"]
+  },
+  {
+    "id": 6,
+    "title": "Исправить атомарность транзакций в API",
+    "description": "Использовать MongoDB сессии для атомарного создания транзакции и обновления баланса",
+    "status": "completed",
+    "priority": "high",
+    "createdAt": "2026-07-10T11:30:00Z",
+    "completedAt": "2026-07-10T12:00:00Z",
+    "tags": ["api", "database", "security"]
+  },
+  {
+    "id": 7,
+    "title": "Обновить README.md",
+    "description": "Обновить документацию, чтобы она соответствовала реальному стеку и структуре проекта",
+    "status": "completed",
+    "priority": "low",
+    "createdAt": "2026-07-10T11:30:00Z",
+    "completedAt": "2026-07-10T12:10:00Z",
+    "tags": ["docs"]
+  },
+  {
+    "id": 8,
+    "title": "Добавить логотип на экран логина, регистрации и главную страницу",
+    "description": "Добавить логотип (public/logo.png) на главную страницу, экран логина и экран регистрации в Flutter-приложении",
+    "status": "completed",
+    "priority": "medium",
+    "createdAt": "2026-07-10T12:30:00Z",
+    "completedAt": "2026-07-10T12:40:00Z",
+    "tags": ["ui", "flutter"]
+  },
+  {
+    "id": 9,
+    "title": "Улучшить дизайн хедера главной страницы",
+    "description": "Увеличить логотип, добавить приветствие с именем пользователя и показать месячную чистую прибыль",
+    "status": "completed",
+    "priority": "medium",
+    "createdAt": "2026-07-10T12:45:00Z",
+    "completedAt": "2026-07-10T12:55:00Z",
+    "tags": ["ui", "flutter", "design"]
+  },
+  {
+    "id": 10,
+    "title": "Добавить поддержку биометрической аутентификации",
+    "description": "Установить local_auth пакет, настроить права, реализовать логику входа через отпечаток пальца/лицо",
+    "status": "completed",
+    "priority": "high",
+    "createdAt": "2026-07-10T13:00:00Z",
+    "completedAt": "2026-07-10T13:15:00Z",
+    "tags": ["flutter", "security", "feature"]
+  },
+  {
+    "id": 11,
+    "title": "Исправить сохранение PIN и биометрии",
+    "description": "Исправить дублирование методов, настроить SecureStorageService для веб, восстановить функциональность сохранения настроек",
+    "status": "completed",
+    "priority": "high",
+    "createdAt": "2026-07-10T13:20:00Z",
+    "completedAt": "2026-07-10T13:40:00Z",
+    "tags": ["flutter", "security", "bugfix"]
+  }
+]

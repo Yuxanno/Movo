@@ -148,4 +148,47 @@ class ApiService {
     final data = _decode(res) as Map<String, dynamic>;
     return data.map((k, v) => MapEntry(k, (v as num).toDouble()));
   }
+
+  // ── User settings ──────────────────────────────────────────────────────────
+
+  /// Загружает настройки пользователя из MongoDB (pinEnabled, biometricsEnabled, lang).
+  /// Вызывается при каждом запуске/логине чтобы восстановить актуальное состояние.
+  Future<Map<String, dynamic>> fetchUserSettings() async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/user/settings'),
+      headers: _headers,
+    ).timeout(timeoutDuration);
+    return _decode(res) as Map<String, dynamic>;
+  }
+
+  /// Обновляет одно или несколько полей настроек в MongoDB.
+  /// [pinCode] — новый PIN (строка) или null чтобы удалить.
+  /// [currentPin] — текущий PIN (нужен для смены или удаления).
+  /// [biometricsEnabled] — состояние биометрии.
+  /// [lang] — язык интерфейса ('ru', 'en', 'uz').
+  Future<Map<String, dynamic>> updateUserSettings({
+    String? pinCode,
+    bool includePinCode = false,
+    String? currentPin,
+    bool? biometricsEnabled,
+    String? lang,
+  }) async {
+    final body = <String, dynamic>{};
+    if (includePinCode) body['pinCode'] = pinCode; // null = удалить PIN
+    if (currentPin != null) body['currentPin'] = currentPin;
+    if (biometricsEnabled != null) body['biometricsEnabled'] = biometricsEnabled;
+    if (lang != null) body['lang'] = lang;
+
+    final res = await http.patch(
+      Uri.parse('$baseUrl/user/settings'),
+      headers: _headers,
+      body: jsonEncode(body),
+    ).timeout(timeoutDuration);
+
+    final data = _decode(res) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw Exception(data['error'] ?? 'Ошибка обновления настроек');
+    }
+    return data;
+  }
 }

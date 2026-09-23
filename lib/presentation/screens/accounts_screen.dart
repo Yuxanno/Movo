@@ -31,8 +31,6 @@ class _AccountsScreenState extends State<AccountsScreen> {
     setState(() => _saving = true);
     final store = context.read<AppStore>();
     final color = _colors[store.accounts.length % _colors.length];
-    // addAccount уже делает insert(0, account) локально — fetchAccounts не нужен,
-    // иначе счёт появится дважды (локально + из ответа сервера)
     await store.addAccount({'name': _name, 'icon': _icon, 'color': color, 'balance': 0, 'currency': _currency, 'isShared': false});
     setState(() { _name = ''; _icon = 'card'; _currency = 'UZS'; _showForm = false; _saving = false; });
   }
@@ -48,7 +46,6 @@ class _AccountsScreenState extends State<AccountsScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Header
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(store.t('my_accounts'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
               GestureDetector(
@@ -58,11 +55,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
               ),
             ]),
             const SizedBox(height: 16),
-
-            // Add form
             if (_showForm) _buildForm(store),
-
-            // Account list
             if (store.accounts.isEmpty)
               Center(child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 48),
@@ -172,7 +165,6 @@ class _AccountDetail extends StatefulWidget {
 
 class _AccountDetailState extends State<_AccountDetail> {
   String _filter = 'all';
-  // Собственный изолированный список — не мутирует store.transactions
   List<TransactionModel> _localTxs = [];
   bool _loading = true;
 
@@ -186,7 +178,6 @@ class _AccountDetailState extends State<_AccountDetail> {
     if (!mounted) return;
     setState(() => _loading = true);
     final store = context.read<AppStore>();
-    // fetchTransactionsForAccount — изолированный метод, не трогает store.transactions
     final txs = await store.fetchTransactionsForAccount(widget.account.id);
     if (!mounted) return;
     setState(() { _localTxs = txs; _loading = false; });
@@ -196,10 +187,7 @@ class _AccountDetailState extends State<_AccountDetail> {
   Widget build(BuildContext context) {
     final store = context.watch<AppStore>();
     final color = parseColor(widget.account.color);
-
-    final txs = _localTxs
-        .where((t) => _filter == 'all' || t.type == _filter)
-        .toList();
+    final txs = _localTxs.where((t) => _filter == 'all' || t.type == _filter).toList();
     final income  = _localTxs.where((t) => t.type == 'income') .fold<double>(0, (s, t) => s + t.amount);
     final expense = _localTxs.where((t) => t.type == 'expense').fold<double>(0, (s, t) => s + t.amount);
 
@@ -208,7 +196,7 @@ class _AccountDetailState extends State<_AccountDetail> {
       body: SafeArea(
         child: RefreshIndicator(
           color: const Color(0xFF16a34a),
-          onRefresh: _load, // Pull-to-refresh перезагружает только этот счёт
+          onRefresh: _load,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
@@ -222,7 +210,6 @@ class _AccountDetailState extends State<_AccountDetail> {
                 ]),
               ),
               const SizedBox(height: 16),
-              // Account card
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(gradient: LinearGradient(colors: [color.withAlpha(238), color.withAlpha(153)]), borderRadius: BorderRadius.circular(16)),
@@ -260,7 +247,6 @@ class _AccountDetailState extends State<_AccountDetail> {
                 ]),
               ),
               const SizedBox(height: 16),
-              // Filter tabs
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8)]),

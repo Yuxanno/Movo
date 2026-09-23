@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/secure_storage_service.dart';
 import '../../data/app_store.dart';
 import '../../data/api_service.dart';
 import '../../main.dart';
-import 'app_shell.dart';
 import 'register_screen.dart';
 import 'pin_screen.dart';
 
@@ -43,14 +42,19 @@ class _LoginScreenState extends State<LoginScreen> {
       // Сохраняем JWT — все последующие запросы пойдут с Authorization: Bearer
       final token = data['token'] as String?;
       if (token != null && token.isNotEmpty) await store.saveToken(token);
+
+      // Применяем настройки из ответа сервера (lang, biometricsEnabled, pinEnabled)
+      await store.applySettingsFromLoginResponse(data);
+
       await store.fetchAccounts();
       await store.fetchTransactions();
       await store.fetchCategories();
       await store.fetchRates();
       if (!mounted) return;
       // Если есть PIN — попросить ввести перед входом
-      final prefs = await SharedPreferences.getInstance();
-      final savedPin = prefs.getString('pin_code');
+      // БЫЛО: prefs.getString('pin_code')  ← plain text в SharedPreferences
+      // СТАЛО: SecureStorageService.getPin() ← AES-256 / Keychain
+      final savedPin = await SecureStorageService.getPin();
       if (savedPin != null && mounted) {
         navigatorKey.currentState!.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => PinScreen(
@@ -89,11 +93,14 @@ class _LoginScreenState extends State<LoginScreen> {
               color: const Color(0xFF16a34a),
               child: Column(children: [
                 Container(
-                  width: 80, height: 80,
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24),
-                    boxShadow: [BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 16)]),
-                  child: const Center(child: Icon(Icons.location_on, color: Color(0xFF16a34a), size: 40)),
-                ),
+              width: 80, height: 80,
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24),
+                boxShadow: [BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 16)]),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Image.asset('public/logo.png', fit: BoxFit.cover),
+              ),
+            ),
                 const SizedBox(height: 12),
                 const Text('Movo', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5)),
                 const SizedBox(height: 4),

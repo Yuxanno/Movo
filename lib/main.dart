@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +8,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'dart:async';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'core/secure_storage_service.dart';
 import 'data/app_store.dart';
 import 'presentation/screens/app_shell.dart';
 import 'presentation/screens/login_screen.dart';
@@ -52,10 +52,14 @@ class MovoApp extends StatelessWidget {
           // Токен загружен до первого сетевого вызова — запросы сразу идут с Authorization
           if (savedToken != null) store.restoreToken(savedToken!);
           Future.microtask(() {
+            store.loadBiometrics();
+            store.loadPinStatus();
             store.fetchAccounts();
             store.fetchTransactions();
             store.fetchCategories();
             store.fetchRates();
+            // Синхронизируем настройки с MongoDB при каждом запуске
+            store.syncSettingsFromServer();
           });
         }
         return store;
@@ -183,13 +187,31 @@ class _AppEntryState extends State<AppEntry> {
   }
 
   Future<void> _route() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hasPin = prefs.getString('pin_code') != null;
+    // БЫЛО: prefs.getString('pin_code')  ← plain text в SharedPreferences
+    // СТАЛО: SecureStorageService.getPin() ← AES-256 / Keychain
+    final savedPin = await SecureStorageService.getPin();
+    final hasPin = savedPin != null;
+    final store = context.read<AppStore>();
+    await store.loadBiometrics();
     if (!mounted) return;
 
     if (widget.savedUser == null) {
       navigatorKey.currentState!.pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
     } else if (hasPin) {
+      // Сначала попробуем биометрию, если она включена
+      if (store.biometricsEnabled) {
+        final authenticated = await store.authenticateWithBiometrics(
+          reason: 'Войдите с помощью биометрии',
+        );
+        if (authenticated && mounted) {
+          navigatorKey.currentState!.pushReplacement(MaterialPageRoute(
+            builder: (_) => const AppShellWithLifecycle(),
+          ));
+          return;
+        }
+      }
+
+      // Если биометрия не сработала или отключена — запрашиваем PIN
       navigatorKey.currentState!.pushReplacement(MaterialPageRoute(builder: (_) => PinScreen(
         onSuccess: () => navigatorKey.currentState!.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const AppShellWithLifecycle()),
@@ -228,6 +250,8 @@ class _AppShellWithLifecycleState extends State<AppShellWithLifecycle> with Widg
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Загружаем состояние биометрии
+    Future.microtask(() => context.read<AppStore>().loadBiometrics());
     // Загружаем рекламу и показываем через 5 секунд (только на мобильных)
     if (!kIsWeb) {
       _adService.load().then((_) {
@@ -247,13 +271,36 @@ class _AppShellWithLifecycleState extends State<AppShellWithLifecycle> with Widg
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
+    print('AppLifecycleState: $state');
     if (state == AppLifecycleState.paused) {
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getString('pin_code') != null) _locked = true;
+      // БЫЛО: prefs.getString('pin_code') != null
+      // СТАЛО: SecureStorageService.getPin() != null
+      final pin = await SecureStorageService.getPin();
+      print('Pin exists: ${pin != null}');
+      if (pin != null) _locked = true;
+      print('Set _locked to: $_locked');
     } else if (state == AppLifecycleState.resumed && _locked && !_showingPin) {
+      print('Resuming app: _locked=$_locked, _showingPin=$_showingPin');
       _locked = false;
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getString('pin_code') == null) return;
+      final pin = await SecureStorageService.getPin();
+      if (pin == null) {
+        print('No pin set, skip lock');
+        return;
+      }
+      final store = context.read<AppStore>();
+      print('Biometrics enabled: ${store.biometricsEnabled}');
+
+      // Сначала попробуем биометрию, если она включена
+      if (store.biometricsEnabled) {
+        final authenticated = await store.authenticateWithBiometrics(
+          reason: 'Разблокируйте приложение',
+        );
+        print('Biometrics authenticated: $authenticated');
+        if (authenticated) return;
+      }
+
+      // Если биометрия не сработала или отключена — запрашиваем PIN
+      print('Showing PIN screen');
       _showingPin = true;
       await navigatorKey.currentState!.push(MaterialPageRoute(
         fullscreenDialog: true,

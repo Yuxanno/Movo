@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/secure_storage_service.dart';
 import '../../data/app_store.dart';
-import '../../core/utils/helpers.dart';
 import '../../main.dart';
 import '../widgets/currency_calculator.dart';
 import 'pin_screen.dart';
@@ -15,12 +14,18 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _biometry = false;
-
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<AppStore>().loadLanguage());
+    Future.microtask(_reload);
+  }
+
+  void _reload() {
+    if (!mounted) return;
+    final store = context.read<AppStore>();
+    store.loadPinStatus();
+    store.loadBiometrics();
+    store.loadLanguage();
   }
 
   void _showLanguageDialog() {
@@ -95,49 +100,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }),
                 _SettingRow(icon: Icons.language, label: store.t('language'), trailing: flag, onTap: _showLanguageDialog),
                 
-                FutureBuilder<SharedPreferences>(
-                  future: SharedPreferences.getInstance(),
-                  builder: (context, snapshot) {
-                    final prefs = snapshot.data;
-                    final bool hasPin = prefs?.getString('pin_code') != null;
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(children: [
-                            Container(width: 32, height: 32, decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8)),
-                               child: const Icon(Icons.lock_outline, size: 16, color: Color(0xFF6b7280))),
-                            const SizedBox(width: 12),
-                            Text(store.t('security_pin'), style: const TextStyle(fontSize: 14, color: Color(0xFF374151))),
-                          ]),
-                          Switch(
-                            value: hasPin,
-                            activeColor: const Color(0xFF16a34a),
-                            onChanged: (v) async {
-                              if (v) {
-                                await Navigator.push(context, MaterialPageRoute(builder: (_) => const PinScreen(isConfirming: false)));
-                                setState(() {});
-                              } else {
-                                await Navigator.push(context, MaterialPageRoute(
-                                  builder: (_) => PinScreen(
-                                    title: store.t('enter_current_pin'),
-                                    onSuccess: () async {
-                                      final p = await SharedPreferences.getInstance();
-                                      await p.remove('pin_code');
-                                      setState(() {});
-                                    },
-                                  ),
-                                ));
-                                setState(() {});
-                              }
-                            },
-                          ),
-                        ],
+                // PIN-переключатель — состояние хранится в AppStore.pinEnabled,
+                // загружается при каждом появлении экрана через _reload()
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(children: [
+                        Container(width: 32, height: 32, decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8)),
+                           child: const Icon(Icons.lock_outline, size: 16, color: Color(0xFF6b7280))),
+                        const SizedBox(width: 12),
+                        Text(store.t('security_pin'), style: const TextStyle(fontSize: 14, color: Color(0xFF374151))),
+                      ]),
+                      Switch(
+                        value: store.pinEnabled,
+                        activeColor: const Color(0xFF16a34a),
+                        onChanged: (v) async {
+                          if (v) {
+                            await Navigator.push(context, MaterialPageRoute(builder: (_) => const PinScreen(isConfirming: false)));
+                            // PinScreen сохраняет PIN через store.setPinCode();
+                            // обновляем store чтобы переключатель отразил новое состояние
+                            if (mounted) await context.read<AppStore>().loadPinStatus();
+                          } else {
+                            await Navigator.push(context, MaterialPageRoute(
+                              builder: (_) => PinScreen(
+                                title: store.t('enter_current_pin'),
+                                onSuccess: () async {
+                                  // Удаляем PIN через store — синхронизируется с MongoDB
+                                  await context.read<AppStore>().setPinCode(null);
+                                },
+                              ),
+                            ));
+                            if (mounted) await context.read<AppStore>().loadPinStatus();
+                          }
+                        },
                       ),
-                    );
-                  }
+                    ],
+                  ),
                 ),
 
                 Padding(
@@ -149,7 +149,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                        const SizedBox(width: 12),
                        Text(store.t('biometry'), style: const TextStyle(fontSize: 14, color: Color(0xFF374151))),
                     ]),
-                    Switch(value: _biometry, activeColor: const Color(0xFF16a34a), onChanged: (v) => setState(() => _biometry = v)),
+                    Switch(
+                      value: store.biometricsEnabled,
+                      activeColor: const Color(0xFF16a34a),
+                      onChanged: (v) async {
+                        // Если включаем биометрию — сначала проверка
+                        if (v) {
+                          final canUse = await context.read<AppStore>().authenticateWithBiometrics(
+                            reason: 'Подтвердите включение биометрии',
+                          );
+                          if (canUse) {
+                            await context.read<AppStore>().setBiometrics(true);
+                          }
+                        } else {
+                          await context.read<AppStore>().setBiometrics(false);
+                        }
+                      }
+                    ),
                   ]),
                 ),
               ]),
@@ -160,8 +176,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  final savedPin = prefs.getString('pin_code');
+                  // БЫЛО: prefs.getString('pin_code')  ← plain text
+                  // СТАЛО: SecureStorageService.getPin() ← AES-256 / Keychain
+                  final savedPin = await SecureStorageService.getPin();
                   if (!mounted) return;
                   if (savedPin != null) {
                     navigatorKey.currentState!.push(MaterialPageRoute(

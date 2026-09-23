@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/secure_storage_service.dart';
 import '../../data/app_store.dart';
 import '../../data/api_service.dart';
 import 'app_shell.dart';
@@ -104,8 +104,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         setState(() { _pinFirst = next; _pin = ''; _pinConfirming = true; });
       } else {
         if (next == _pinFirst) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('pin_code', next);
+          // БЫЛО: prefs.setString('pin_code', next)  ← plain text
+          // СТАЛО: SecureStorageService.savePin(next) ← AES-256 / Keychain
+          await SecureStorageService.savePin(next);
           setState(() { _step = 3; _pin = ''; _pinConfirming = false; _pinFirst = ''; });
         } else {
           setState(() { _pinError = true; _pin = ''; _pinConfirming = false; _pinFirst = ''; });
@@ -136,6 +137,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
           padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 20, 24, 40),
           color: const Color(0xFF16a34a),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Center(
+              child: Container(
+                width: 72, height: 72,
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22),
+                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 16)]),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: Image.asset('public/logo.png', fit: BoxFit.cover),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             Row(children: [
               if (_step > 0 && _step < 3)
                 GestureDetector(

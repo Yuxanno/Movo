@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:local_auth/local_auth.dart';
 import 'dart:convert';
 import 'api_service.dart';
 import 'models/account_model.dart';
 import 'models/transaction_model.dart';
 import 'models/category_model.dart';
 import '../core/app_snackbar.dart';
+import '../core/secure_storage_service.dart';
 
 class AppStore extends ChangeNotifier {
   final ApiService _api = ApiService();
@@ -23,6 +25,16 @@ class AppStore extends ChangeNotifier {
   static const _keyUser  = 'movo_user';
   static const _keyToken = 'movo_token'; // JWT хранится отдельно от данных пользователя
   static const _keyLang  = 'lang';
+  static const _keyBiometrics = 'movo_biometrics_enabled';
+
+  // ── PIN ───────────────────────────────────────────────────────────────
+  bool _pinEnabled = false;
+  bool get pinEnabled => _pinEnabled;
+
+  // ── Биометрия ─────────────────────────────────────────────────────────
+  bool _biometricsEnabled = false;
+  bool get biometricsEnabled => _biometricsEnabled;
+  final LocalAuthentication _localAuth = LocalAuthentication();
 
   // ── Локализация ───────────────────────────────────────────────────────
   String lang = 'ru';
@@ -69,7 +81,8 @@ class AppStore extends ChangeNotifier {
       'new_category': 'Новая категория', 'icon_label': 'Иконка', 'color_label': 'Цвет', 'current_month': 'Текущий месяц',
       'enter_current_pin': 'Введите текущий PIN', 'confirm_logout': 'Подтвердите выход', 'add_account': 'Добавить счёт',
       'history_tab': 'История', 'receipt_tab': 'Чек', '30_days': '30 дней', 'shared': 'Совместный', 'balance': 'Баланс',
-      'no_data': 'Нет данных', 'not_enough_data': 'Мало данных', 'dashboard': 'Главная',
+      'no_data': 'Нет данных', 'not_enough_data': 'Недостаточно данных', 'dashboard': 'Главная',
+      'hi': 'Привет', 'month': 'за месяц',
     },
     'en': {
       'settings': 'Settings', 'language': 'Language', 'accounts': 'Accounts', 'operations': 'Operations',
@@ -114,6 +127,7 @@ class AppStore extends ChangeNotifier {
       'enter_current_pin': 'Enter current PIN', 'confirm_logout': 'Confirm logout', 'add_account': 'Add account',
       'history_tab': 'History', 'receipt_tab': 'Receipt', '30_days': '30 days', 'shared': 'Shared', 'balance': 'Balance',
       'no_data': 'No data', 'not_enough_data': 'Not enough data', 'dashboard': 'Dashboard',
+      'hi': 'Hi', 'month': 'this month',
     },
     'uz': {
       'settings': 'Sozlamalar', 'language': 'Til', 'accounts': 'Hisoblar', 'operations': 'Operatsiyalar',
@@ -158,6 +172,7 @@ class AppStore extends ChangeNotifier {
       'enter_current_pin': 'Joriy PIN-kodni kiriting', 'confirm_logout': 'Chiqishni tasdiqlang', 'add_account': 'Hisob qo\'shish',
       'history_tab': 'Tarix', 'receipt_tab': 'Chek', '30_days': '30 kun', 'shared': 'Birgalikda', 'balance': 'Balans',
       'no_data': 'Ma\'lumot yo\'q', 'not_enough_data': 'Ma\'lumot yetarli emas', 'dashboard': 'Asosiy',
+      'hi': 'Salom', 'month': 'oy uchun',
     }
   };
 
@@ -171,25 +186,22 @@ class AppStore extends ChangeNotifier {
     _api.setToken(token);
   }
 
-  /// Сохраняет JWT в SharedPreferences и сразу передаёт его в ApiService.
+  /// Сохраняет JWT в зашифрованное хранилище и сразу передаёт его в ApiService.
   /// Вызывается после успешного login/register.
   Future<void> saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyToken, token);
+    await SecureStorageService.saveToken(token);
     _api.setToken(token);
   }
 
-  /// Читает JWT из SharedPreferences (при старте приложения).
+  /// Читает JWT из зашифрованного хранилища (при старте приложения).
   /// Возвращает null если токена нет — запросы пройдут без Authorization.
   static Future<String?> loadTokenFromPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyToken);
+    return await SecureStorageService.getToken();
   }
 
   /// Стирает JWT при выходе. После этого ApiService тоже теряет токен.
   Future<void> _clearToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyToken);
+    await SecureStorageService.deleteToken();
     _api.setToken(null);
   }
 
@@ -197,15 +209,167 @@ class AppStore extends ChangeNotifier {
 
   Future<void> setLanguage(String l) async {
     lang = l;
+    notifyListeners();
+    // Сохраняем локально для мгновенного восстановления при следующем старте
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLang, l);
-    notifyListeners();
+    // Синхронизируем с MongoDB (фоново, не блокируем UI)
+    try {
+      await _api.updateUserSettings(lang: l);
+    } catch (e) {
+      debugPrint('setLanguage sync error: $e');
+    }
   }
 
   Future<void> loadLanguage() async {
     final prefs = await SharedPreferences.getInstance();
     lang = prefs.getString(_keyLang) ?? 'ru';
     notifyListeners();
+  }
+
+  // ── PIN-код ────────────────────────────────────────────────────────────
+
+  /// Загружает статус PIN из SecureStorage в память. Вызывается при каждом
+  /// показе ProfileScreen чтобы переключатель отображал актуальное состояние.
+  Future<void> loadPinStatus() async {
+    final pin = await SecureStorageService.getPin();
+    _pinEnabled = pin != null;
+    notifyListeners();
+  }
+
+  /// Устанавливает или удаляет PIN.
+  /// [pin] = null → удалить PIN. Строка → установить новый PIN.
+  /// Сохраняет в SecureStorage (для локальной проверки) и в MongoDB (для персистентности).
+  Future<void> setPinCode(String? pin, {String? currentPin}) async {
+    if (pin == null) {
+      // Удаление PIN
+      await SecureStorageService.deletePin();
+      _pinEnabled = false;
+    } else {
+      // Установка нового PIN
+      await SecureStorageService.savePin(pin);
+      _pinEnabled = true;
+    }
+    // Синхронизируем с MongoDB
+    try {
+      await _api.updateUserSettings(
+        pinCode: pin,
+        includePinCode: true,
+        currentPin: currentPin,
+      );
+    } catch (e) {
+      debugPrint('setPinCode sync error: $e');
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadBiometrics() async {
+    final prefs = await SharedPreferences.getInstance();
+    _biometricsEnabled = prefs.getBool(_keyBiometrics) ?? false;
+    notifyListeners();
+  }
+
+  Future<void> setBiometrics(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyBiometrics, enabled);
+    _biometricsEnabled = enabled;
+    notifyListeners();
+    // Синхронизируем с MongoDB (фоново)
+    try {
+      await _api.updateUserSettings(biometricsEnabled: enabled);
+    } catch (e) {
+      debugPrint('setBiometrics sync error: $e');
+    }
+  }
+
+  /// Применяет настройки из ответа login/register к локальному состоянию.
+  /// Вызывается сразу после успешного логина.
+  Future<void> applySettingsFromLoginResponse(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Язык
+    final serverLang = data['lang'] as String? ?? 'ru';
+    lang = serverLang;
+    await prefs.setString(_keyLang, serverLang);
+
+    // Биометрия
+    final bioEnabled = data['biometricsEnabled'] as bool? ?? false;
+    _biometricsEnabled = bioEnabled;
+    await prefs.setBool(_keyBiometrics, bioEnabled);
+
+    // PIN: сервер говорит был ли PIN установлен для этого аккаунта.
+    // Локальный PIN в SecureStorage может быть с другого устройства/сессии.
+    // Если сервер говорит PIN не установлен — очищаем локальный.
+    final pinEnabled = data['pinEnabled'] as bool? ?? false;
+    if (!pinEnabled) {
+      await SecureStorageService.deletePin();
+      _pinEnabled = false;
+    } else {
+      // PIN установлен на сервере — проверяем есть ли локальная копия
+      final localPin = await SecureStorageService.getPin();
+      _pinEnabled = localPin != null;
+    }
+
+    notifyListeners();
+  }
+
+  /// Загружает настройки из MongoDB и применяет их локально.
+  /// Вызывается при логине и старте приложения.
+  Future<void> syncSettingsFromServer() async {
+    try {
+      final settings = await _api.fetchUserSettings();
+      final prefs = await SharedPreferences.getInstance();
+
+      // PIN
+      final pinEnabled = settings['pinEnabled'] as bool? ?? false;
+      if (!pinEnabled) {
+        // Сервер говорит PIN не установлен — очищаем локальное хранилище
+        await SecureStorageService.deletePin();
+        _pinEnabled = false;
+      } else {
+        // PIN установлен на сервере; локальный PIN остаётся (он нужен для проверки)
+        // Если локального нет — помечаем что нужно переустановить
+        final localPin = await SecureStorageService.getPin();
+        _pinEnabled = localPin != null;
+        // Если локального PIN нет, но на сервере он есть — это значит
+        // пользователь зашёл с нового устройства. Пусть переустановит PIN.
+      }
+
+      // Биометрия
+      final bioEnabled = settings['biometricsEnabled'] as bool? ?? false;
+      await prefs.setBool(_keyBiometrics, bioEnabled);
+      _biometricsEnabled = bioEnabled;
+
+      // Язык
+      final serverLang = settings['lang'] as String? ?? 'ru';
+      await prefs.setString(_keyLang, serverLang);
+      lang = serverLang;
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('syncSettingsFromServer error: $e');
+      // Если сервер недоступен — используем локальные данные (уже загружены)
+    }
+  }
+
+  Future<bool> authenticateWithBiometrics({required String reason}) async {
+    try {
+      final bool canCheckBiometrics = await _localAuth.canCheckBiometrics;
+      final bool isDeviceSupported = await _localAuth.isDeviceSupported();
+      if (!canCheckBiometrics || !isDeviceSupported) return false;
+
+      final bool authenticated = await _localAuth.authenticate(
+        localizedReason: reason,
+        options: const AuthenticationOptions(
+          biometricOnly: true,
+          stickyAuth: true,
+        ),
+      );
+      return authenticated;
+    } catch (e) {
+      debugPrint('Biometric auth error: $e');
+      return false;
+    }
   }
 
   // ── Пользователь ──────────────────────────────────────────────────────

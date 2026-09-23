@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import '../../core/secure_storage_service.dart';
 import '../../data/app_store.dart';
 import 'app_shell.dart';
 
@@ -40,10 +40,11 @@ class _PinScreenState extends State<PinScreen> {
     setState(() { _pin += key; _error = false; _errorMessage = ""; });
 
     if (_pin.length == 4) {
-      final prefs = await SharedPreferences.getInstance();
-      final savedPin = prefs.getString('pin_code');
+      // БЫЛО: prefs.getString('pin_code')  ← plain text в SharedPreferences
+      // СТАЛО: SecureStorageService.getPin() ← AES-256 / Keychain
+      final savedPin = await SecureStorageService.getPin();
 
-      // 1. Verify Mode (onSuccess provided)
+      // 1. Режим верификации (onSuccess задан снаружи)
       if (widget.onSuccess != null) {
         if (_pin == savedPin) {
           if (mounted) {
@@ -56,12 +57,12 @@ class _PinScreenState extends State<PinScreen> {
         return;
       }
 
-      // 2. Setting New PIN (Confirmation stage)
+      // 2. Установка нового PIN — стадия подтверждения
       if (_isConfirmStage) {
         if (_pin == _cachedFirstPin) {
-          await prefs.setString('pin_code', _pin);
+          // Сохраняем PIN через store — он запишет в SecureStorage и синхронизирует с MongoDB
+          await context.read<AppStore>().setPinCode(_pin);
           if (mounted) {
-            // If we came from Settings, we should just pop back
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
             } else {
@@ -74,7 +75,7 @@ class _PinScreenState extends State<PinScreen> {
         return;
       }
 
-      // 3. Normal Login / Pre-setting Initial Entry
+      // 3. Обычный вход / начало создания PIN
       if (savedPin != null) {
         if (_pin == savedPin) {
           if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AppShell()));
@@ -82,7 +83,7 @@ class _PinScreenState extends State<PinScreen> {
           _handleError(context.read<AppStore>().t('invalid_pin'));
         }
       } else {
-        // Start Creation flow: Move to confirmation stage on the same screen
+        // Переходим к стадии подтверждения на том же экране
         setState(() {
           _cachedFirstPin = _pin;
           _pin = "";
@@ -116,25 +117,7 @@ class _PinScreenState extends State<PinScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Close Button (Now always available for settings/verify modes)
-            Align(
-              alignment: Alignment.topLeft,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 0, 0),
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: 36, height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 8)],
-                    ),
-                    child: const Icon(Icons.close, size: 18, color: Color(0xFF6b7280)),
-                  ),
-                ),
-              ),
-            ),
+
             const Spacer(),
             Text(
               title,

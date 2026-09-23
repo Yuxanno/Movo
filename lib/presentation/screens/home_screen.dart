@@ -17,18 +17,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final PageController _pageCtrl = PageController(viewportFraction: 0.82);
   int _activePage = 0;
 
-  /// Возвращает строго List<double> длиной 7 — суммы расходов/доходов
-  /// за каждый из последних 7 дней (индекс 0 = 6 дней назад, индекс 6 = сегодня).
-  /// Дни без транзакций → 0.0. Тип [txType]: 'income' или 'expense'.
   List<double> _last7DaysAmounts(List<TransactionModel> txs, String txType) {
     final now = DateTime.now();
-    // Опорная точка — начало сегодняшнего дня
     final today = DateTime(now.year, now.month, now.day);
-
     return List.generate(7, (i) {
-      // i=0 → 6 дней назад, i=6 → сегодня
       final dayStart = today.subtract(Duration(days: 6 - i));
-      final dayEnd = dayStart.add(const Duration(days: 1)); // не включая
+      final dayEnd = dayStart.add(const Duration(days: 1));
       return txs
           .where((t) =>
               t.type == txType &&
@@ -54,17 +48,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            // ── Header ──
             SliverToBoxAdapter(child: _buildHeader(store)),
-            // ── Bank Cards Carousel ──
             SliverToBoxAdapter(child: _buildCarousel(store)),
-            // ── Month Overview ──
             SliverToBoxAdapter(child: _buildMonthOverview(store)),
-            // ── Quick Actions ──
             SliverToBoxAdapter(child: _buildQuickActions(store)),
-            // ── Balance Chart ──
             SliverToBoxAdapter(child: _buildBalanceChart(store)),
-            // ── Recent Transactions ──
             SliverToBoxAdapter(child: _buildRecentTransactions(store)),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
@@ -75,7 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildHeader(AppStore store) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 52, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 52, 20, 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,
@@ -85,24 +73,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo + bell
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(children: [
-                const Icon(Icons.location_on_outlined, color: Color(0xFF22c55e), size: 22),
-                const SizedBox(width: 4),
-                const Text('Movo', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [BoxShadow(color: Colors.black.withAlpha(12), blurRadius: 6)],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.asset('public/logo.png', fit: BoxFit.cover),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${store.t('hi')}, ${store.userName?.isNotEmpty == true ? store.userName : 'Друг'}!',
+                      style: const TextStyle(fontSize: 14, color: Color(0xFF6b7280), fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text('Movo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+                  ],
+                ),
               ]),
-              Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 8)]),
-                child: const Icon(Icons.notifications_none, color: Color(0xFF4b5563), size: 20),
-              ),
+              Row(children: [
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 8)]),
+                  child: const Icon(Icons.notifications_none, color: Color(0xFF4b5563), size: 22),
+                ),
+              ]),
             ],
           ),
-          const SizedBox(height: 16),
-          // Balance
+          const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -114,15 +123,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 4),
                   FittedBox(
                     fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
-                    child: Text(formatCurrency(store.totalBalance), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF1f2937))),
+                    child: Text(formatCurrency(store.totalBalance), style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Color(0xFF1f2937))),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(12)),
+                        child: Text(
+                          '+${formatAmount(store.monthlyIncome - store.monthlyExpense)}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF16a34a)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('${store.t('month')}', style: const TextStyle(fontSize: 12, color: Color(0xFF6b7280))),
+                    ],
                   ),
                 ],
               )),
               const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: const Color(0xFF374151), elevation: 1, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
-                child: Text(store.t('accounts'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 8, offset: const Offset(0, 2))]),
+                child: Row(children: [
+                  const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF16a34a), size: 18),
+                  const SizedBox(width: 6),
+                  Text(store.t('accounts'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF1f2937))),
+                ]),
               ),
             ],
           ),
@@ -136,24 +164,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (accounts.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        child: GestureDetector(
-          onTap: () {},
-          child: Container(
-            height: 158, width: double.infinity,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFd1d5db), width: 2, strokeAlign: BorderSide.strokeAlignInside), color: Colors.white.withAlpha(153)),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Icon(Icons.add_circle_outline, size: 48, color: Color(0xFF9ca3af)),
-              const SizedBox(height: 8),
-              Text(store.t('add_account'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF9ca3af))),
-            ]),
-          ),
+        child: Container(
+          height: 158, width: double.infinity,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFd1d5db), width: 2, strokeAlign: BorderSide.strokeAlignInside), color: Colors.white.withAlpha(153)),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.add_circle_outline, size: 48, color: Color(0xFF9ca3af)),
+            const SizedBox(height: 8),
+            Text(store.t('add_account'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF9ca3af))),
+          ]),
         ),
       );
     }
     return Column(
       children: [
         SizedBox(
-          height: 190, // Увеличил со 170 до 190
+          height: 190,
           child: PageView.builder(
             controller: _pageCtrl,
             itemCount: accounts.length,
@@ -326,8 +351,8 @@ class _BankCard extends StatelessWidget {
     final expense = accountTx.where((t) => t.type == 'expense').fold<double>(0, (s, t) => s + t.amount);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4), // Уменьшил вертикальный отступ
-      padding: const EdgeInsets.all(14), // Уменьшил внутренний паддинг с 16 до 14
+      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(colors: [color.withAlpha(238), color.withAlpha(153)]),
         borderRadius: BorderRadius.circular(16),
@@ -337,7 +362,6 @@ class _BankCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Icon + name
           Row(children: [
             Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.white.withAlpha(51), borderRadius: BorderRadius.circular(8)),
               child: const Icon(Icons.credit_card, color: Colors.white, size: 16)),
@@ -349,7 +373,6 @@ class _BankCard extends StatelessWidget {
               child: Text(store.t('shared'), style: const TextStyle(fontSize: 10, color: Colors.white)),
             )],
           ]),
-          // Balance
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(store.t('balance'), style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(153))),
             const SizedBox(height: 2),
@@ -359,7 +382,6 @@ class _BankCard extends StatelessWidget {
               Text(account.currency, style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(179))),
             ]),
           ]),
-          // Income / Expense
           Row(children: [
             Expanded(child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -431,8 +453,6 @@ class _TransactionRow extends StatelessWidget {
 // ── SparkLine ──
 class _SparkLine extends StatelessWidget {
   final Color color;
-  /// Список из 7 значений (суммы за каждый день).
-  /// Нули допустимы — painter обработает их корректно.
   final List<double> data;
   const _SparkLine({required this.color, required this.data});
   @override
@@ -449,23 +469,17 @@ class _SparkPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (data.isEmpty) return;
-
-    // Нормализация: находим максимум и масштабируем все точки под высоту холста.
-    // Если все значения нулевые — рисуем плоскую линию по центру (нет деления на 0).
     final maxVal = data.reduce((a, b) => a > b ? a : b);
     final effectiveMax = maxVal > 0 ? maxVal : 1.0;
-
     final paint = Paint()
       ..color = color
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
-
     final path = Path();
     for (int i = 0; i < data.length; i++) {
       final x = (i / (data.length - 1)) * size.width;
-      // Нормализованная Y: 0 внизу, max наверху; оставляем 1px отступ сверху/снизу
       final normalized = data[i] / effectiveMax;
       final y = (size.height - 2) - normalized * (size.height - 4) + 1;
       if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
@@ -474,7 +488,6 @@ class _SparkPainter extends CustomPainter {
   }
 
   @override
-  // Перерисовываем только если данные реально изменились
   bool shouldRepaint(_SparkPainter old) => old.data != data || old.color != color;
 }
 
@@ -499,11 +512,9 @@ class _BalanceChartPainter extends CustomPainter {
       running += t.type == 'income' ? t.amount : -t.amount;
       points.add(running);
     }
-
     final mn = points.reduce((a, b) => a < b ? a : b) * 0.98;
     final mx = points.reduce((a, b) => a > b ? a : b) * 1.02;
     final range = (mx - mn).abs() < 0.1 ? 1.0 : mx - mn;
-
     final path = Path();
     final areaPath = Path();
     for (int i = 0; i < points.length; i++) {
@@ -514,12 +525,8 @@ class _BalanceChartPainter extends CustomPainter {
     areaPath.lineTo(size.width, size.height);
     areaPath.lineTo(0, size.height);
     areaPath.close();
-
-    // Fill
     final fillPaint = Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x3322c55e), Color(0x0022c55e)]).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawPath(areaPath, fillPaint);
-
-    // Stroke
     canvas.drawPath(path, Paint()..color = const Color(0xFF22c55e)..strokeWidth = 2.5..style = PaintingStyle.stroke..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round);
   }
 

@@ -1,0 +1,120 @@
+[
+  {
+    "id": 1,
+    "title": "JWT-токен хранится в SharedPreferences",
+    "description": "JWT-токен хранится в небезопасном SharedPreferences вместо flutter_secure_storage",
+    "severity": "high",
+    "status": "resolved",
+    "files": [
+      "lib/core/secure_storage_service.dart",
+      "lib/data/app_store.dart",
+      "lib/data/stores/auth_store.dart"
+    ],
+    "tags": ["security", "flutter"],
+    "createdAt": "2026-07-10T11:30:00Z",
+    "resolvedAt": "2026-07-10T11:40:00Z"
+  },
+  {
+    "id": 2,
+    "title": "Отсутствие Zod-валидации для accounts и categories",
+    "description": "API-роуты для создания/обновления счетов и категорий не используют Zod-валидацию",
+    "severity": "high",
+    "status": "resolved",
+    "files": [
+      "lib/validators.ts",
+      "app/api/accounts/route.ts",
+      "app/api/accounts/[id]/route.ts",
+      "app/api/categories/route.ts",
+      "app/api/categories/[id]/route.ts"
+    ],
+    "tags": ["api", "validation", "security"],
+    "createdAt": "2026-07-10T11:30:00Z",
+    "resolvedAt": "2026-07-10T11:50:00Z"
+  },
+  {
+    "id": 3,
+    "title": "Нет возможности обновления категорий",
+    "description": "Отсутствует PATCH/PUT-роут для обновления категорий в API",
+    "severity": "medium",
+    "status": "resolved",
+    "files": [
+      "app/api/categories/[id]/route.ts"
+    ],
+    "tags": ["api", "feature"],
+    "createdAt": "2026-07-10T11:30:00Z",
+    "resolvedAt": "2026-07-10T11:50:00Z"
+  },
+  {
+    "id": 4,
+    "title": "Неатомарные операции при создании и удалении транзакции",
+    "description": "Создание/удаление транзакции и обновление баланса — две отдельные операции без транзакции MongoDB",
+    "severity": "high",
+    "status": "resolved",
+    "files": [
+      "app/api/transactions/route.ts",
+      "app/api/transactions/[id]/route.ts"
+    ],
+    "tags": ["api", "database", "security"],
+    "createdAt": "2026-07-10T11:30:00Z",
+    "resolvedAt": "2026-07-10T12:00:00Z"
+  },
+  {
+    "id": 5,
+    "title": "Дублирование логики в сторах Flutter",
+    "description": "Проект содержит AuthStore, AccountStore и AppStore с дублирующейся логикой",
+    "severity": "medium",
+    "status": "open",
+    "files": [
+      "lib/data/stores/auth_store.dart",
+      "lib/data/stores/account_store.dart",
+      "lib/data/app_store.dart"
+    ],
+    "tags": ["architecture", "flutter"],
+    "createdAt": "2026-07-10T11:30:00Z"
+  },
+  {
+    "id": 6,
+    "title": "Недостаточное логирование ошибок в API",
+    "description": "Многие роуты возвращают только общие сообщения без логирования деталей ошибок",
+    "severity": "low",
+    "status": "open",
+    "tags": ["api", "debugging"],
+    "createdAt": "2026-07-10T11:30:00Z"
+  },
+  {
+    "id": 7,
+    "title": "Нет локального кэширования в Flutter",
+    "description": "Приложение полностью зависит от интернета, нет офлайн-режима",
+    "severity": "medium",
+    "status": "open",
+    "tags": ["flutter", "feature", "offline"],
+    "createdAt": "2026-07-10T11:30:00Z"
+  },
+  {
+    "id": 8,
+    "title": "Неактуальный README.md",
+    "description": "README описывает FinanceFlow с Firebase, а реальный проект — Movo с Next.js и MongoDB",
+    "severity": "low",
+    "status": "resolved",
+    "files": [
+      "README.md"
+    ],
+    "tags": ["docs"],
+    "createdAt": "2026-07-10T11:30:00Z",
+    "resolvedAt": "2026-07-10T12:10:00Z"
+  },
+  {
+    "id": 9,
+    "title": "PIN и биометрия не сохраняются",
+    "description": "Дублирование методов в AppStore, неправильные параметры FlutterSecureStorage для веб, не сохранение настроек",
+    "severity": "high",
+    "status": "resolved",
+    "files": [
+      "lib/data/app_store.dart",
+      "lib/core/secure_storage_service.dart"
+    ],
+    "tags": ["flutter", "security", "bugfix"],
+    "createdAt": "2026-07-10T13:20:00Z",
+    "resolvedAt": "2026-07-10T13:40:00Z"
+  }
+]
