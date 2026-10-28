@@ -122,7 +122,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(store.t('balance_period'), style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(204))),
                 const SizedBox(height: 4),
-                Text('${balance >= 0 ? "+" : ""}${formatAmount(balance)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text('${balance >= 0 ? "+" : ""}${formatAmount(balance)}',
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
                 const SizedBox(height: 12),
                 Row(children: [
                   Expanded(child: Container(
@@ -131,10 +136,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     child: Row(children: [
                       const Icon(Icons.arrow_upward, color: Colors.white, size: 16),
                       const SizedBox(width: 8),
-                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(store.t('income'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
-                        Text(formatAmount(totalIncome), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ]),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(formatAmount(totalIncome),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ),
+                      ])),
                     ]),
                   )),
                   const SizedBox(width: 12),
@@ -144,10 +154,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     child: Row(children: [
                       const Icon(Icons.arrow_downward, color: Colors.white, size: 16),
                       const SizedBox(width: 8),
-                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(store.t('expense'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
-                        Text(formatAmount(totalExpense), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ]),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(formatAmount(totalExpense),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ),
+                      ])),
                     ]),
                   )),
                 ]),

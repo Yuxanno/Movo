@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "db:seed": "ts-node --project tsconfig.scripts.json scripts/seed-db.ts",
     "app": "flutter run",
-    "flutter": "flutter run -d chrome",
+    "flutter": "flutter run -d chrome --no-dds",
     "app:build": "flutter build apk --release",
     "app:build:debug": "flutter build apk --debug",
     "app:build:split": "flutter build apk --release --split-per-abi",

@@ -103,6 +103,25 @@ class ApiService {
     await http.delete(Uri.parse('$baseUrl/accounts/$id'), headers: _headers).timeout(timeoutDuration);
   }
 
+  Future<AccountModel> updateAccount(String id, Map<String, dynamic> body) async {
+    final res = await http.patch(Uri.parse('$baseUrl/accounts/$id'), headers: _headers, body: jsonEncode(body)).timeout(timeoutDuration);
+    // Сервер может вернуть обновлённый объект или просто {message: ...}
+    final data = _decode(res);
+    if (data is Map && data.containsKey('_id')) {
+      return AccountModel.fromJson(data as Map<String, dynamic>);
+    }
+    // Fallback: конструируем из переданных данных
+    return AccountModel(
+      id: id,
+      name: body['name'] ?? '',
+      icon: body['icon'] ?? 'card',
+      color: body['color'] ?? '#22c55e',
+      balance: (body['balance'] ?? 0).toDouble(),
+      currency: body['currency'] ?? 'UZS',
+      isShared: body['isShared'] ?? false,
+    );
+  }
+
   // ── Transactions ──
   Future<List<TransactionModel>> fetchTransactions({String? accountId}) async {
     final url = accountId != null ? '$baseUrl/transactions?accountId=$accountId' : '$baseUrl/transactions';

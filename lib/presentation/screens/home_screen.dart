@@ -7,6 +7,25 @@ import '../../core/utils/helpers.dart';
 import 'receipt_scanner_sheet.dart';
 import 'transactions_screen.dart';
 
+const _homeAccountIcons = <String, IconData>{
+  'card':       Icons.credit_card,
+  'wallet':     Icons.account_balance_wallet,
+  'bank':       Icons.account_balance,
+  'cash':       Icons.payments,
+  'savings':    Icons.savings,
+  'home':       Icons.home,
+  'business':   Icons.business_center,
+  'family':     Icons.family_restroom,
+  'shopping':   Icons.shopping_bag,
+  'travel':     Icons.flight,
+  'car':        Icons.directions_car,
+  'phone':      Icons.phone_android,
+  'star':       Icons.star,
+  'gift':       Icons.card_giftcard,
+  'crypto':     Icons.currency_bitcoin,
+  'investment': Icons.trending_up,
+};
+
 class DashboardScreen extends StatefulWidget {
   final VoidCallback? onAddTransaction;
   const DashboardScreen({Key? key, this.onAddTransaction}) : super(key: key);
@@ -14,21 +33,17 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final PageController _pageCtrl = PageController(viewportFraction: 0.82);
+  final PageController _pageCtrl = PageController(viewportFraction: 0.88);
   int _activePage = 0;
 
-  List<double> _last7DaysAmounts(List<TransactionModel> txs, String txType) {
+  List<double> _last7DaysAmounts(List<TransactionModel> txs, String type) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     return List.generate(7, (i) {
-      final dayStart = today.subtract(Duration(days: 6 - i));
-      final dayEnd = dayStart.add(const Duration(days: 1));
+      final day = today.subtract(Duration(days: 6 - i));
       return txs
-          .where((t) =>
-              t.type == txType &&
-              !t.date.isBefore(dayStart) &&
-              t.date.isBefore(dayEnd))
-          .fold<double>(0.0, (sum, t) => sum + t.amount);
+          .where((t) => t.type == type && !t.date.isBefore(day) && t.date.isBefore(day.add(const Duration(days: 1))))
+          .fold(0.0, (s, t) => s + t.amount);
     });
   }
 
@@ -40,20 +55,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: RefreshIndicator(
         color: const Color(0xFF16a34a),
         onRefresh: () async {
-          await Future.wait([
-            store.fetchAccounts(),
-            store.fetchTransactions(),
-          ]);
+          await Future.wait([store.fetchAccounts(), store.fetchTransactions()]);
         },
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(child: _buildHeader(store)),
             SliverToBoxAdapter(child: _buildCarousel(store)),
-            SliverToBoxAdapter(child: _buildMonthOverview(store)),
+            SliverToBoxAdapter(child: _buildOverview(store)),
             SliverToBoxAdapter(child: _buildQuickActions(store)),
-            SliverToBoxAdapter(child: _buildBalanceChart(store)),
-            SliverToBoxAdapter(child: _buildRecentTransactions(store)),
+            SliverToBoxAdapter(child: _buildChart(store)),
+            SliverToBoxAdapter(child: _buildRecentTxs(store)),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
@@ -61,18 +73,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ─── Header ───────────────────────────────────────────────────────────────
+
   Widget _buildHeader(AppStore store) {
+    final name = store.userName?.isNotEmpty == true ? store.userName! : 'Друг';
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 52, 20, 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
           colors: [Color(0xFFd4ede3), Color(0xFFF0F7F4)],
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Топ строка ──
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -81,37 +99,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   width: 40, height: 40,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [BoxShadow(color: Colors.black.withAlpha(12), blurRadius: 6)],
+                    borderRadius: BorderRadius.circular(13),
+                    boxShadow: [BoxShadow(color: Colors.black.withAlpha(14), blurRadius: 8, offset: const Offset(0, 2))],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(11),
                     child: Image.asset('public/logo.png', fit: BoxFit.cover),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${store.t('hi')}, ${store.userName?.isNotEmpty == true ? store.userName : 'Друг'}!',
-                      style: const TextStyle(fontSize: 14, color: Color(0xFF6b7280), fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text('Movo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
-                  ],
-                ),
+                const SizedBox(width: 10),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${store.t('hi')}, $name!',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af), fontWeight: FontWeight.w400)),
+                  const Text('Movo',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+                ]),
               ]),
-              Row(children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 8)]),
-                  child: const Icon(Icons.notifications_none, color: Color(0xFF4b5563), size: 22),
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(12), blurRadius: 8, offset: const Offset(0, 2))],
                 ),
-              ]),
+                child: const Icon(Icons.notifications_none_rounded, color: Color(0xFF374151), size: 20),
+              ),
             ],
           ),
-          const SizedBox(height: 24),
+
+          const SizedBox(height: 20),
+
+          // ── Баланс + кнопка счетов ──
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -119,38 +137,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(store.t('total_balance'), style: const TextStyle(fontSize: 14, color: Color(0xFF6b7280))),
+                  Text(store.t('total_balance'),
+                      style: const TextStyle(fontSize: 14, color: Color(0xFF6b7280))),
                   const SizedBox(height: 4),
                   FittedBox(
-                    fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
-                    child: Text(formatCurrency(store.totalBalance), style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Color(0xFF1f2937))),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(12)),
-                        child: Text(
-                          '+${formatAmount(store.monthlyIncome - store.monthlyExpense)}',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF16a34a)),
-                        ),
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      formatCurrency(store.totalBalance),
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1f2937),
+                        letterSpacing: -1,
                       ),
-                      const SizedBox(width: 8),
-                      Text('${store.t('month')}', style: const TextStyle(fontSize: 12, color: Color(0xFF6b7280))),
-                    ],
+                    ),
                   ),
                 ],
               )),
               const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 8, offset: const Offset(0, 2))]),
-                child: Row(children: [
-                  const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF16a34a), size: 18),
-                  const SizedBox(width: 6),
-                  Text(store.t('accounts'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF1f2937))),
-                ]),
+              ElevatedButton(
+                onPressed: () {},
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF374151),
+                  elevation: 1,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                child: Text(store.t('accounts'),
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
               ),
             ],
           ),
@@ -159,184 +175,254 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ─── Карусель счетов ──────────────────────────────────────────────────────
+
   Widget _buildCarousel(AppStore store) {
     final accounts = store.accounts;
     if (accounts.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Container(
-          height: 158, width: double.infinity,
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFd1d5db), width: 2, strokeAlign: BorderSide.strokeAlignInside), color: Colors.white.withAlpha(153)),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            const Icon(Icons.add_circle_outline, size: 48, color: Color(0xFF9ca3af)),
-            const SizedBox(height: 8),
-            Text(store.t('add_account'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF9ca3af))),
+          height: 80,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFe5e7eb), width: 1.5),
+          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.add_circle_outline, size: 20, color: Color(0xFF9ca3af)),
+            const SizedBox(width: 8),
+            Text(store.t('add_account'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
           ]),
         ),
       );
     }
-    return Column(
-      children: [
-        SizedBox(
-          height: 190,
-          child: PageView.builder(
-            controller: _pageCtrl,
-            itemCount: accounts.length,
-            onPageChanged: (i) => setState(() => _activePage = i),
-            itemBuilder: (_, i) => _BankCard(account: accounts[i], transactions: store.transactions, store: store),
+    return Column(children: [
+      SizedBox(
+        height: 200,
+        child: PageView.builder(
+          controller: _pageCtrl,
+          itemCount: accounts.length,
+          onPageChanged: (i) => setState(() => _activePage = i),
+          itemBuilder: (_, i) => _BankCard(
+            account: accounts[i],
+            transactions: store.transactions,
+            store: store,
           ),
         ),
-        if (accounts.length > 1) ...[
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(accounts.length, (i) {
-              final active = i == _activePage;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                width: active ? 20 : 6, height: 6,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(3),
-                  color: active ? parseColor(accounts[i].color) : const Color(0xFFd1d5db),
-                ),
-              );
-            }),
-          ),
-        ],
+      ),
+      if (accounts.length > 1) ...[
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(accounts.length, (i) {
+            final active = i == _activePage;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 280),
+              width: active ? 18 : 5, height: 5,
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(3),
+                color: active ? parseColor(accounts[i].color) : const Color(0xFFd1d5db),
+              ),
+            );
+          }),
+        ),
       ],
-    );
+      const SizedBox(height: 16),
+    ]);
   }
 
-  Widget _buildMonthOverview(AppStore store) {
+  // ─── Обзор месяца ─────────────────────────────────────────────────────────
+
+  Widget _buildOverview(AppStore store) {
     final incomeData  = _last7DaysAmounts(store.transactions, 'income');
     final expenseData = _last7DaysAmounts(store.transactions, 'expense');
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
       child: Container(
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 2))]),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(store.t('summary'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(store.t('income'), style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
-                const SizedBox(height: 4),
-                Row(children: [
-                  Text(formatAmount(store.monthlyIncome), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
-                  const SizedBox(width: 8),
-                  _SparkLine(color: const Color(0xFF22c55e), data: incomeData),
-                ]),
-              ])),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(store.t('expense'), style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
-                const SizedBox(height: 4),
-                Row(children: [
-                  Text(formatAmount(store.monthlyExpense), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
-                  const SizedBox(width: 8),
-                  _SparkLine(color: const Color(0xFFf97316), data: expenseData),
-                ]),
-              ])),
-            ]),
-          ],
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 2))],
         ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(store.t('summary'),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(store.t('income'),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
+              const SizedBox(height: 4),
+              Row(children: [
+                Text(formatAmount(store.monthlyIncome),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 60, height: 24,
+                  child: CustomPaint(
+                    painter: _SparkPainter(const Color(0xFF22c55e), incomeData),
+                  ),
+                ),
+              ]),
+            ])),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(store.t('expense'),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
+              const SizedBox(height: 4),
+              Row(children: [
+                Text(formatAmount(store.monthlyExpense),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 60, height: 24,
+                  child: CustomPaint(
+                    painter: _SparkPainter(const Color(0xFFf97316), expenseData),
+                  ),
+                ),
+              ]),
+            ])),
+          ]),
+        ]),
       ),
     );
   }
 
+  // ─── Быстрые действия ─────────────────────────────────────────────────────
+
   Widget _buildQuickActions(AppStore store) {
     final actions = [
-      {'label': store.t('income'), 'icon': Icons.arrow_upward, 'color': const Color(0xFF16a34a)},
-      {'label': store.t('expense'), 'icon': Icons.arrow_downward, 'color': const Color(0xFFef4444)},
-      {'label': store.t('history_tab'), 'icon': Icons.access_time, 'color': const Color(0xFF6366f1)},
-      {'label': store.t('receipt_tab'), 'icon': Icons.receipt_long, 'color': const Color(0xFFf59e0b)},
+      {'label': store.t('income'),      'icon': Icons.arrow_upward_rounded,   'bg': const Color(0xFFdcfce7), 'fg': const Color(0xFF16a34a)},
+      {'label': store.t('expense'),     'icon': Icons.arrow_downward_rounded,  'bg': const Color(0xFFffe4e6), 'fg': const Color(0xFFef4444)},
+      {'label': store.t('history_tab'), 'icon': Icons.access_time_rounded,     'bg': const Color(0xFFede9fe), 'fg': const Color(0xFF6366f1)},
+      {'label': store.t('receipt_tab'), 'icon': Icons.receipt_long_rounded,    'bg': const Color(0xFFfef3c7), 'fg': const Color(0xFFf59e0b)},
     ];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(store.t('quick_actions'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
+          Text(store.t('quick_actions'),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: actions.map((a) => Column(children: [
-              GestureDetector(
+            children: actions.map((a) {
+              return Expanded(child: GestureDetector(
                 onTap: () {
                   final label = a['label'] as String;
                   if (label == store.t('receipt_tab')) {
-                    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const ReceiptScannerSheet());
+                    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
+                        builder: (_) => const ReceiptScannerSheet());
                   } else if (label == store.t('income') || label == store.t('expense')) {
-                    if (widget.onAddTransaction != null) widget.onAddTransaction!();
+                    widget.onAddTransaction?.call();
                   } else if (label == store.t('history_tab')) {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => ChangeNotifierProvider.value(value: context.read<AppStore>(), child: const TransactionsScreen())));
+                    Navigator.push(context, MaterialPageRoute(builder: (_) =>
+                        ChangeNotifierProvider.value(value: context.read<AppStore>(), child: const TransactionsScreen())));
                   }
                 },
                 child: Container(
-                  width: 48, height: 48,
-                  decoration: BoxDecoration(color: (a['color'] as Color).withAlpha(30), borderRadius: BorderRadius.circular(14)),
-                  child: Icon(a['icon'] as IconData, color: a['color'] as Color, size: 20),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: (a['bg'] as Color),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(children: [
+                    Icon(a['icon'] as IconData, color: a['fg'] as Color, size: 20),
+                    const SizedBox(height: 5),
+                    Text(a['label'] as String,
+                        style: TextStyle(fontSize: 10, color: a['fg'] as Color),
+                        textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ]),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(a['label'] as String, style: const TextStyle(fontSize: 10, color: Color(0xFF6b7280))),
-            ])).toList(),
+              ));
+            }).toList(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBalanceChart(AppStore store) {
+  // ─── График ───────────────────────────────────────────────────────────────
+
+  Widget _buildChart(AppStore store) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
       child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 2))]),
-        child: Column(
-          children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(store.t('balance_dyn'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
-              Text(store.t('30_days'), style: TextStyle(fontSize: 12, color: Colors.grey[400])),
-            ]),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 80,
-              child: CustomPaint(size: const Size(double.infinity, 80), painter: _BalanceChartPainter(store.transactions, store.totalBalance, store)),
-            ),
-          ],
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withAlpha(7), blurRadius: 12, offset: const Offset(0, 3))],
         ),
+        child: Column(children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(store.t('balance_dyn'),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+            Text(store.t('30_days'),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF9ca3af))),
+          ]),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 90,
+            child: CustomPaint(
+              size: const Size(double.infinity, 90),
+              painter: _BalanceChartPainter(store.transactions, store.totalBalance, store),
+            ),
+          ),
+        ]),
       ),
     );
   }
 
-  Widget _buildRecentTransactions(AppStore store) {
+  // ─── Последние операции ───────────────────────────────────────────────────
+
+  Widget _buildRecentTxs(AppStore store) {
     final txs = store.transactions.take(5).toList();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
       child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 2))]),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(store.t('recent_ops'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
-            const SizedBox(height: 8),
-            if (txs.isEmpty)
-              Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text(store.t('no_ops'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af)))))
-            else
-              ...txs.map((t) => _TransactionRow(tx: t, categories: store.categories, store: store)),
-          ],
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withAlpha(7), blurRadius: 12, offset: const Offset(0, 3))],
         ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(store.t('recent_ops'),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => ChangeNotifierProvider.value(value: context.read<AppStore>(), child: const TransactionsScreen()))),
+              child: Text(store.t('history_tab'),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF16a34a), fontWeight: FontWeight.w600)),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          if (txs.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: Text(store.t('no_ops'),
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF9ca3af)))),
+            )
+          else
+            ...txs.asMap().entries.map((e) => Column(children: [
+              _TxRow(tx: e.value, store: store),
+              if (e.key < txs.length - 1)
+                const Divider(height: 1, color: Color(0xFFf3f4f6)),
+            ])),
+        ]),
       ),
     );
   }
 }
 
-// ── Bank Card ──
+// ─── Bank Card ────────────────────────────────────────────────────────────────
+
 class _BankCard extends StatelessWidget {
   final AccountModel account;
   final List<TransactionModel> transactions;
@@ -346,120 +432,157 @@ class _BankCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = parseColor(account.color);
+    final iconData = _homeAccountIcons[account.icon] ?? Icons.credit_card;
+    final colorDark = HSLColor.fromColor(color)
+        .withLightness((HSLColor.fromColor(color).lightness - 0.13).clamp(0.0, 1.0))
+        .toColor();
     final accountTx = transactions.where((t) => t.accountId == account.id).toList();
     final income = accountTx.where((t) => t.type == 'income').fold<double>(0, (s, t) => s + t.amount);
     final expense = accountTx.where((t) => t.type == 'expense').fold<double>(0, (s, t) => s + t.amount);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [color.withAlpha(238), color.withAlpha(153)]),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: color.withAlpha(68), blurRadius: 24, offset: const Offset(0, 8))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(children: [
-            Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.white.withAlpha(51), borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.credit_card, color: Colors.white, size: 16)),
-            const SizedBox(width: 8),
-            Text(account.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
-            if (account.isShared) ...[const Spacer(), Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(color: Colors.white.withAlpha(51), borderRadius: BorderRadius.circular(8)),
-              child: Text(store.t('shared'), style: const TextStyle(fontSize: 10, color: Colors.white)),
-            )],
-          ]),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(store.t('balance'), style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(153))),
-            const SizedBox(height: 2),
-            Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-              Text(formatAmount(account.balance), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(width: 4),
-              Text(account.currency, style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(179))),
-            ]),
-          ]),
-          Row(children: [
-            Expanded(child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: Colors.white.withAlpha(38), borderRadius: BorderRadius.circular(10)),
-              child: Row(children: [
-                Icon(Icons.trending_up, color: Colors.white.withAlpha(204), size: 14),
-                const SizedBox(width: 6),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(store.t('income'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(153))),
-                  Text(formatAmount(income), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-                ]),
-              ]),
-            )),
-            const SizedBox(width: 8),
-            Expanded(child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: Colors.white.withAlpha(38), borderRadius: BorderRadius.circular(10)),
-              child: Row(children: [
-                Icon(Icons.trending_down, color: Colors.white.withAlpha(204), size: 14),
-                const SizedBox(width: 6),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(store.t('expense'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(153))),
-                  Text(formatAmount(expense), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-                ]),
-              ]),
-            )),
-          ]),
+        gradient: LinearGradient(colors: [color, colorDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: color.withAlpha(100), blurRadius: 20, offset: const Offset(0, 8)),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(children: [
+          Positioned(right: -25, top: -25,
+            child: Container(width: 120, height: 120,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withAlpha(15)))),
+          Positioned(right: -8, bottom: -8,
+            child: Icon(iconData, size: 100, color: Colors.white.withAlpha(25))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Заголовок
+                Row(children: [
+                  Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(color: Colors.white.withAlpha(40), borderRadius: BorderRadius.circular(11)),
+                    child: Icon(iconData, color: Colors.white, size: 17),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(account.name,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(color: Colors.white.withAlpha(30), borderRadius: BorderRadius.circular(6)),
+                      child: Text(account.currency,
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white.withAlpha(210))),
+                    ),
+                  ])),
+                ]),
+                // Баланс
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(store.t('balance'),
+                      style: TextStyle(fontSize: 11, color: Colors.white.withAlpha(155))),
+                  const SizedBox(height: 3),
+                  Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                    Flexible(child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(formatAmount(account.balance),
+                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: -0.5),
+                          maxLines: 1),
+                    )),
+                    const SizedBox(width: 6),
+                    Text(account.currency,
+                        style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(180), fontWeight: FontWeight.w500)),
+                  ]),
+                ]),
+                // Доходы / расходы
+                Row(children: [
+                  Expanded(child: _CardStat(icon: Icons.trending_up, label: store.t('income'), value: formatAmount(income))),
+                  const SizedBox(width: 8),
+                  Expanded(child: _CardStat(icon: Icons.trending_down, label: store.t('expense'), value: formatAmount(expense))),
+                ]),
+              ],
+            ),
+          ),
+        ]),
       ),
     );
   }
 }
 
-// ── Transaction Row ──
-class _TransactionRow extends StatelessWidget {
+class _CardStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _CardStat({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(color: Colors.white.withAlpha(35), borderRadius: BorderRadius.circular(11)),
+      child: Row(children: [
+        Icon(icon, size: 12, color: Colors.white.withAlpha(190)),
+        const SizedBox(width: 5),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: TextStyle(fontSize: 8, color: Colors.white.withAlpha(155))),
+          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
+            child: Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
+        ])),
+      ]),
+    );
+  }
+}
+
+// ─── Transaction Row ──────────────────────────────────────────────────────────
+
+class _TxRow extends StatelessWidget {
   final TransactionModel tx;
-  final List categories;
   final AppStore store;
-  const _TransactionRow({required this.tx, required this.categories, required this.store});
+  const _TxRow({required this.tx, required this.store});
 
   @override
   Widget build(BuildContext context) {
     final isIncome = tx.type == 'income';
-    final color = isIncome ? const Color(0xFF22c55e) : const Color(0xFFef4444);
+    final color = isIncome ? const Color(0xFF16a34a) : const Color(0xFFef4444);
+    final bg = isIncome ? const Color(0xFFdcfce7) : const Color(0xFFffe4e6);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(color: color.withAlpha(34), borderRadius: BorderRadius.circular(10)),
-            child: Icon(isIncome ? Icons.trending_up : Icons.trending_down, color: color, size: 16),
-          ),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(tx.description.isNotEmpty ? tx.description : store.translateCategory(tx.category, tx.category), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1f2937)), maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text(formatDate(tx.date, store.lang), style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
-          ])),
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(children: [
+        Container(
+          width: 38, height: 38,
+          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+          child: Icon(isIncome ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: color, size: 16),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(
-            '${isIncome ? "+" : "-"}${formatAmount(tx.amount)}',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isIncome ? const Color(0xFF16a34a) : const Color(0xFFef4444)),
+            tx.description.isNotEmpty ? tx.description : store.translateCategory(tx.category, tx.category),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF111827)),
+            maxLines: 1, overflow: TextOverflow.ellipsis,
           ),
-        ],
-      ),
+          const SizedBox(height: 2),
+          Text(formatDate(tx.date, store.lang),
+              style: const TextStyle(fontSize: 11, color: Color(0xFF9ca3af))),
+        ])),
+        const SizedBox(width: 8),
+        Text(
+          '${isIncome ? "+" : "−"}${formatAmount(tx.amount)}',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color),
+        ),
+      ]),
     );
   }
 }
 
-// ── SparkLine ──
-class _SparkLine extends StatelessWidget {
-  final Color color;
-  final List<double> data;
-  const _SparkLine({required this.color, required this.data});
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(size: const Size(60, 24), painter: _SparkPainter(color, data));
-  }
-}
+// ─── SparkLine (используется в _OverviewTile через _SparkPainter напрямую) ────
 
 class _SparkPainter extends CustomPainter {
   final Color color;
@@ -468,7 +591,7 @@ class _SparkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (data.isEmpty) return;
+    if (data.isEmpty || data.every((v) => v == 0)) return;
     final maxVal = data.reduce((a, b) => a > b ? a : b);
     final effectiveMax = maxVal > 0 ? maxVal : 1.0;
     final paint = Paint()
@@ -480,8 +603,7 @@ class _SparkPainter extends CustomPainter {
     final path = Path();
     for (int i = 0; i < data.length; i++) {
       final x = (i / (data.length - 1)) * size.width;
-      final normalized = data[i] / effectiveMax;
-      final y = (size.height - 2) - normalized * (size.height - 4) + 1;
+      final y = (size.height - 2) - (data[i] / effectiveMax) * (size.height - 4) + 1;
       if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
     }
     canvas.drawPath(path, paint);
@@ -491,7 +613,8 @@ class _SparkPainter extends CustomPainter {
   bool shouldRepaint(_SparkPainter old) => old.data != data || old.color != color;
 }
 
-// ── Balance Chart Painter ──
+// ─── Balance Chart Painter ────────────────────────────────────────────────────
+
 class _BalanceChartPainter extends CustomPainter {
   final List<TransactionModel> transactions;
   final double totalBalance;
@@ -501,7 +624,13 @@ class _BalanceChartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (transactions.length < 2) {
-      final tp = TextPainter(text: TextSpan(text: transactions.isEmpty ? store.t('no_data') : store.t('not_enough_data'), style: const TextStyle(color: Color(0xFF9ca3af), fontSize: 12)), textDirection: TextDirection.ltr)..layout();
+      final tp = TextPainter(
+        text: TextSpan(
+          text: transactions.isEmpty ? store.t('no_data') : store.t('not_enough_data'),
+          style: const TextStyle(color: Color(0xFF9ca3af), fontSize: 12),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
       tp.paint(canvas, Offset(size.width / 2 - tp.width / 2, size.height / 2 - tp.height / 2));
       return;
     }
@@ -520,16 +649,25 @@ class _BalanceChartPainter extends CustomPainter {
     for (int i = 0; i < points.length; i++) {
       final x = (i / (points.length - 1)) * size.width;
       final y = size.height - ((points[i] - mn) / range) * size.height;
-      if (i == 0) { path.moveTo(x, y); areaPath.moveTo(x, y); } else { path.lineTo(x, y); areaPath.lineTo(x, y); }
+      if (i == 0) { path.moveTo(x, y); areaPath.moveTo(x, y); }
+      else { path.lineTo(x, y); areaPath.lineTo(x, y); }
     }
     areaPath.lineTo(size.width, size.height);
     areaPath.lineTo(0, size.height);
     areaPath.close();
-    final fillPaint = Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x3322c55e), Color(0x0022c55e)]).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    canvas.drawPath(areaPath, fillPaint);
-    canvas.drawPath(path, Paint()..color = const Color(0xFF22c55e)..strokeWidth = 2.5..style = PaintingStyle.stroke..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round);
+    canvas.drawPath(areaPath, Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: [Color(0x4016a34a), Color(0x0016a34a)],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)));
+    canvas.drawPath(path, Paint()
+      ..color = const Color(0xFF16a34a)
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant CustomPainter old) => true;
 }

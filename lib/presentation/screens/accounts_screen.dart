@@ -1,12 +1,63 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:provider/provider.dart';
 import '../../data/app_store.dart';
 import '../../data/models/account_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../core/utils/helpers.dart';
 
-const _colors = ['#22c55e', '#6366f1', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
 const _currencies = ['UZS', 'USD', 'RUB'];
+
+// Максимально допустимая сумма — 10 триллионов
+const double _kMaxAmount = 10000000000000;
+
+/// Formatter: разрешает только цифры и одну точку, блокирует ввод если
+/// значение превышает [_kMaxAmount].
+class _AmountInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final text = newValue.text;
+    if (!RegExp(r'^[\d.]*$').hasMatch(text)) return oldValue;
+    if (text.split('.').length > 2) return oldValue;
+    final val = double.tryParse(text);
+    if (val != null && val > _kMaxAmount) return oldValue;
+    return newValue;
+  }
+}
+
+const _presetColors = [
+  Color(0xFF22c55e), Color(0xFF16a34a), Color(0xFF14b8a6), Color(0xFF3b82f6),
+  Color(0xFF6366f1), Color(0xFF8b5cf6), Color(0xFFec4899), Color(0xFFef4444),
+  Color(0xFFf59e0b), Color(0xFFf97316), Color(0xFF84cc16), Color(0xFF06b6d4),
+  Color(0xFF1d4ed8), Color(0xFF7c3aed), Color(0xFFdb2777), Color(0xFFdc2626),
+];
+
+const _accountIcons = <String, IconData>{
+  'card':       Icons.credit_card,
+  'wallet':     Icons.account_balance_wallet,
+  'bank':       Icons.account_balance,
+  'cash':       Icons.payments,
+  'savings':    Icons.savings,
+  'home':       Icons.home,
+  'business':   Icons.business_center,
+  'family':     Icons.family_restroom,
+  'shopping':   Icons.shopping_bag,
+  'travel':     Icons.flight,
+  'car':        Icons.directions_car,
+  'phone':      Icons.phone_android,
+  'star':       Icons.star,
+  'gift':       Icons.card_giftcard,
+  'crypto':     Icons.currency_bitcoin,
+  'investment': Icons.trending_up,
+};
+
+String _colorToHex(Color c) =>
+    '#${(c.r * 255).round().toRadixString(16).padLeft(2, '0')}'
+    '${(c.g * 255).round().toRadixString(16).padLeft(2, '0')}'
+    '${(c.b * 255).round().toRadixString(16).padLeft(2, '0')}';
+
+// ─── Главный экран счетов ────────────────────────────────────────────────────
 
 class AccountsScreen extends StatefulWidget {
   const AccountsScreen({Key? key}) : super(key: key);
@@ -15,24 +66,63 @@ class AccountsScreen extends StatefulWidget {
 
 class _AccountsScreenState extends State<AccountsScreen> {
   AccountModel? _selected;
-  bool _showForm = false;
-  String _name = '';
-  String _icon = 'card';
-  String _currency = 'UZS';
-  bool _saving = false;
 
-  @override
-  void initState() {
-    super.initState();
+  void _openAddSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AccountSheet(
+        onSave: (data) => context.read<AppStore>().addAccount(data),
+      ),
+    );
   }
 
-  Future<void> _addAccount() async {
-    if (_name.trim().isEmpty) return;
-    setState(() => _saving = true);
-    final store = context.read<AppStore>();
-    final color = _colors[store.accounts.length % _colors.length];
-    await store.addAccount({'name': _name, 'icon': _icon, 'color': color, 'balance': 0, 'currency': _currency, 'isShared': false});
-    setState(() { _name = ''; _icon = 'card'; _currency = 'UZS'; _showForm = false; _saving = false; });
+  void _openEditSheet(AccountModel account) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AccountSheet(
+        existing: account,
+        onSave: (data) => context.read<AppStore>().updateAccount(account.id, data),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext ctx, AccountModel account) {
+    final store = ctx.read<AppStore>();
+    final lang = store.lang;
+    showDialog(
+      context: ctx,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          lang == 'ru' ? 'Удалить счёт?' : lang == 'uz' ? 'Hisobni o\'chirish?' : 'Delete account?',
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          lang == 'ru' ? 'Счёт "${account.name}" и все его транзакции будут удалены.'
+              : lang == 'uz' ? '"${account.name}" hisobi o\'chiriladi.'
+              : 'Account "${account.name}" will be deleted.',
+          style: const TextStyle(fontSize: 14, color: Color(0xFF6b7280)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(store.t('cancel'), style: const TextStyle(color: Color(0xFF6b7280))),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              store.deleteAccount(account.id);
+            },
+            child: Text(store.t('delete'),
+                style: const TextStyle(color: Color(0xFFef4444), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -47,113 +137,609 @@ class _AccountsScreenState extends State<AccountsScreen> {
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(store.t('my_accounts'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+              Text(store.t('my_accounts'),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
               GestureDetector(
-                onTap: () => setState(() => _showForm = !_showForm),
-                child: Container(width: 36, height: 36, decoration: BoxDecoration(color: const Color(0xFF16a34a), borderRadius: BorderRadius.circular(18)),
-                  child: const Icon(Icons.add, color: Colors.white, size: 20)),
+                onTap: _openAddSheet,
+                child: Container(
+                  width: 38, height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16a34a),
+                    borderRadius: BorderRadius.circular(19),
+                    boxShadow: [BoxShadow(color: const Color(0xFF16a34a).withAlpha(80), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white, size: 22),
+                ),
               ),
             ]),
-            const SizedBox(height: 16),
-            if (_showForm) _buildForm(store),
+            const SizedBox(height: 20),
             if (store.accounts.isEmpty)
               Center(child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 48),
+                padding: const EdgeInsets.symmetric(vertical: 60),
                 child: Column(children: [
-                  const Icon(Icons.credit_card, size: 48, color: Color(0xFFd1d5db)),
-                  const SizedBox(height: 12),
-                  Text(store.t('no_accounts_yet'), style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
+                  Container(
+                    width: 80, height: 80,
+                    decoration: BoxDecoration(color: const Color(0xFFe5e7eb), borderRadius: BorderRadius.circular(24)),
+                    child: const Icon(Icons.credit_card_outlined, size: 40, color: Color(0xFF9ca3af)),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(store.t('no_accounts_yet'),
+                      style: const TextStyle(fontSize: 15, color: Color(0xFF9ca3af), fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _openAddSheet,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(color: const Color(0xFF16a34a), borderRadius: BorderRadius.circular(20)),
+                      child: Text(store.lang == 'ru' ? '+ Создать счёт' : store.lang == 'uz' ? '+ Hisob yaratish' : '+ Create account',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                    ),
+                  ),
                 ]),
               ))
             else
               ...store.accounts.map((a) => _AccountCard(
                 account: a,
                 onTap: () => setState(() => _selected = a),
-                onDelete: () => store.deleteAccount(a.id),
+                onEdit: () => _openEditSheet(a),
+                onDelete: () => _confirmDelete(context, a),
               )),
           ]),
         ),
       ),
     );
   }
-
-  Widget _buildForm(AppStore store) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8)]),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(store.t('new_account'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
-        const SizedBox(height: 12),
-        TextField(
-          onChanged: (v) => _name = v,
-          decoration: InputDecoration(hintText: store.lang == 'ru' ? 'Название (Дом, Семья, Бизнес...)' : store.lang == 'uz' ? 'Nomi (Uy, Oila...)' : 'Name (Home, Family...)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFe5e7eb))), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), isDense: true),
-        ),
-        const SizedBox(height: 12),
-        Text(store.t('currency_label'), style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
-        const SizedBox(height: 6),
-        Row(children: _currencies.map((c) => Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: GestureDetector(
-            onTap: () => setState(() => _currency = c),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(color: _currency == c ? const Color(0xFF16a34a) : const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(20)),
-              child: Text(c, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _currency == c ? Colors.white : const Color(0xFF4b5563))),
-            ),
-          ),
-        )).toList()),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _saving ? null : _addAccount,
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16a34a), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: Text(_saving ? store.t('saving') : store.t('add_account'), style: const TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ),
-      ]),
-    );
-  }
 }
+
+// ─── Карточка счёта ──────────────────────────────────────────────────────────
 
 class _AccountCard extends StatelessWidget {
   final AccountModel account;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
-  const _AccountCard({required this.account, required this.onTap, required this.onDelete});
+  const _AccountCard({required this.account, required this.onTap, required this.onEdit, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
     final color = parseColor(account.color);
+    final iconData = _accountIcons[account.icon] ?? Icons.credit_card;
+    // Светлый или тёмный акцент для второго градиента
+    final colorDark = HSLColor.fromColor(color).withLightness(
+      (HSLColor.fromColor(color).lightness - 0.12).clamp(0.0, 1.0)
+    ).toColor();
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8)]),
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color, colorDark],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(color: color.withAlpha(100), blurRadius: 20, offset: const Offset(0, 8)),
+            BoxShadow(color: color.withAlpha(40), blurRadius: 6, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              // Декоративный круг фона
+              Positioned(
+                right: -30, top: -30,
+                child: Container(
+                  width: 130, height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withAlpha(18),
+                  ),
+                ),
+              ),
+              // Фоновая иконка
+              Positioned(
+                right: -12, bottom: -12,
+                child: Icon(iconData, size: 110, color: Colors.white.withAlpha(30)),
+              ),
+              // Контент
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Заголовок: иконка + имя + кнопки
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Иконка счёта
+                        Container(
+                          width: 42, height: 42,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(45),
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: Icon(iconData, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        // Название + валюта
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(account.name,
+                                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: -0.2)),
+                            const SizedBox(height: 2),
+                            Row(children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withAlpha(35),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(account.currency,
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withAlpha(220))),
+                              ),
+                            ]),
+                          ],
+                        )),
+                        // Кнопка редактировать
+                        GestureDetector(
+                          onTap: onEdit,
+                          child: Container(
+                            width: 34, height: 34,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(40),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(Icons.edit_outlined, size: 16, color: Colors.white.withAlpha(230)),
+                          ),
+                        ),
+                        // Кнопка удалить
+                        GestureDetector(
+                          onTap: onDelete,
+                          child: Container(
+                            width: 34, height: 34,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(40),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(Icons.delete_outline, size: 16, color: Colors.white.withAlpha(230)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    // Разделитель
+                    Container(height: 1, color: Colors.white.withAlpha(30)),
+                    const SizedBox(height: 14),
+                    // Баланс
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Баланс',
+                          style: TextStyle(fontSize: 11, color: Colors.white.withAlpha(160), letterSpacing: 0.3),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  formatAmount(account.balance),
+                                  style: const TextStyle(
+                                    fontSize: 28, fontWeight: FontWeight.bold,
+                                    color: Colors.white, letterSpacing: -0.5,
+                                  ),
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              account.currency,
+                              style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(180), fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Bottom Sheet: создание и редактирование счёта ───────────────────────────
+
+class _AccountSheet extends StatefulWidget {
+  final AccountModel? existing;
+  final Future<void> Function(Map<String, dynamic>) onSave;
+  const _AccountSheet({this.existing, required this.onSave});
+  @override State<_AccountSheet> createState() => _AccountSheetState();
+}
+
+class _AccountSheetState extends State<_AccountSheet> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _balanceCtrl;
+  late String _currency;
+  late String _icon;
+  late Color _color;
+  bool _saving = false;
+  bool _showColorPicker = false;
+  bool _balanceOverLimit = false;
+
+  bool get _isEdit => widget.existing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    _nameCtrl = TextEditingController(text: e?.name ?? '');
+    _balanceCtrl = TextEditingController(text: e == null ? '' : (e.balance == 0 ? '' : e.balance.toStringAsFixed(0)));
+    _currency = e?.currency ?? 'UZS';
+    _icon = e?.icon ?? 'card';
+    _color = e != null ? parseColor(e.color) : const Color(0xFF22c55e);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _balanceCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_nameCtrl.text.trim().isEmpty || _balanceOverLimit) return;
+    setState(() => _saving = true);
+    final balance = double.tryParse(_balanceCtrl.text.replaceAll(' ', '')) ?? 0;
+    await widget.onSave({
+      'name': _nameCtrl.text.trim(),
+      'icon': _icon,
+      'color': _colorToHex(_color),
+      'balance': balance,
+      'currency': _currency,
+      'isShared': false,
+    });
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<AppStore>();
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final lang = store.lang;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + bottomInset),
+      child: SingleChildScrollView(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Row(children: [
-              Container(width: 40, height: 40, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.credit_card, color: Colors.white, size: 20)),
-              const SizedBox(width: 12),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(account.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1f2937))),
-                Text(account.currency, style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
+          // Handle
+          Center(child: Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(color: const Color(0xFFe5e7eb), borderRadius: BorderRadius.circular(2)),
+          )),
+          const SizedBox(height: 18),
+
+          // Заголовок
+          Text(
+            _isEdit
+                ? (lang == 'ru' ? 'Редактировать счёт' : lang == 'uz' ? 'Hisobni tahrirlash' : 'Edit account')
+                : store.t('new_account'),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1f2937)),
+          ),
+          const SizedBox(height: 16),
+
+          // Превью карточки
+          _CardPreview(name: _nameCtrl.text, icon: _icon, color: _color, currency: _currency,
+              balance: double.tryParse(_balanceCtrl.text.replaceAll(' ', '')) ?? 0),
+          const SizedBox(height: 22),
+
+          // Название
+          _buildTextField(
+            controller: _nameCtrl,
+            hint: lang == 'ru' ? 'Название (Дом, Семья, Бизнес...)'
+                : lang == 'uz' ? 'Nomi (Uy, Oila...)' : 'Name (Home, Family...)',
+            icon: Icons.edit_outlined,
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
+
+          // Начальный баланс
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _buildTextField(
+              controller: _balanceCtrl,
+              hint: lang == 'ru' ? 'Начальный баланс (необязательно)'
+                  : lang == 'uz' ? 'Boshlang\'ich balans (ixtiyoriy)' : 'Initial balance (optional)',
+              icon: Icons.account_balance_wallet_outlined,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [_AmountInputFormatter()],
+              isError: _balanceOverLimit,
+              onChanged: (v) {
+                final val = double.tryParse(v.replaceAll(' ', ''));
+                setState(() {
+                  _balanceOverLimit = val != null && val > _kMaxAmount;
+                });
+              },
+            ),
+            if (_balanceOverLimit) ...[
+              const SizedBox(height: 4),
+              Row(children: [
+                const Icon(Icons.warning_amber_rounded, size: 13, color: Color(0xFFef4444)),
+                const SizedBox(width: 4),
+                Text(
+                  lang == 'ru' ? 'Максимум 10 триллионов'
+                      : lang == 'uz' ? 'Maksimum 10 trillion'
+                      : 'Maximum 10 trillion',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFFef4444)),
+                ),
               ]),
-            ]),
-            GestureDetector(onTap: onDelete, child: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFd1d5db))),
+            ],
           ]),
-          const SizedBox(height: 12),
-          RichText(text: TextSpan(children: [
-            TextSpan(text: formatAmount(account.balance), style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-            TextSpan(text: ' ${account.currency}', style: const TextStyle(fontSize: 14, color: Color(0xFF9ca3af))),
-          ])),
+          const SizedBox(height: 20),
+
+          // Валюта
+          _SectionLabel(label: store.t('currency_label')),
+          const SizedBox(height: 8),
+          Row(children: _currencies.map((c) => Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _currency = c),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                decoration: BoxDecoration(
+                  color: _currency == c ? _color : const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: _currency == c ? [BoxShadow(color: _color.withAlpha(70), blurRadius: 8, offset: const Offset(0, 3))] : [],
+                ),
+                child: Text(c, style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600,
+                  color: _currency == c ? Colors.white : const Color(0xFF6b7280),
+                )),
+              ),
+            ),
+          )).toList()),
+          const SizedBox(height: 20),
+
+          // Иконка
+          _SectionLabel(label: lang == 'ru' ? 'Иконка' : lang == 'uz' ? 'Ikonka' : 'Icon'),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 56,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: _accountIcons.entries.map((e) {
+                final sel = _icon == e.key;
+                return GestureDetector(
+                  onTap: () => setState(() => _icon = e.key),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 50, height: 50,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: sel ? _color : const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: sel ? [BoxShadow(color: _color.withAlpha(80), blurRadius: 8, offset: const Offset(0, 3))] : [],
+                    ),
+                    child: Icon(e.value, size: 22, color: sel ? Colors.white : const Color(0xFF9ca3af)),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Цвет
+          _SectionLabel(label: lang == 'ru' ? 'Цвет' : lang == 'uz' ? 'Rang' : 'Color'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8, runSpacing: 8,
+            children: [
+              ..._presetColors.map((c) => GestureDetector(
+                onTap: () => setState(() { _color = c; _showColorPicker = false; }),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: c, shape: BoxShape.circle,
+                    border: _color.toARGB32() == c.toARGB32() ? Border.all(color: Colors.white, width: 3) : null,
+                    boxShadow: _color.toARGB32() == c.toARGB32()
+                        ? [BoxShadow(color: c.withAlpha(150), blurRadius: 8, spreadRadius: 1)]
+                        : [BoxShadow(color: Colors.black.withAlpha(18), blurRadius: 4)],
+                  ),
+                  child: _color.toARGB32() == c.toARGB32()
+                      ? const Icon(Icons.check, color: Colors.white, size: 16) : null,
+                ),
+              )),
+              // Своя палитра
+              GestureDetector(
+                onTap: () => setState(() => _showColorPicker = !_showColorPicker),
+                child: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFe5e7eb), width: 2),
+                    gradient: const SweepGradient(colors: [
+                      Color(0xFFef4444), Color(0xFFf59e0b), Color(0xFF22c55e),
+                      Color(0xFF3b82f6), Color(0xFF8b5cf6), Color(0xFFef4444),
+                    ]),
+                  ),
+                  child: const Icon(Icons.colorize, color: Colors.white, size: 16),
+                ),
+              ),
+            ],
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeInOut,
+            child: _showColorPicker
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: ColorPicker(
+                      pickerColor: _color,
+                      onColorChanged: (c) => setState(() => _color = c),
+                      enableAlpha: false,
+                      labelTypes: const [],
+                      pickerAreaHeightPercent: 0.45,
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+
+          const SizedBox(height: 28),
+
+          // Кнопка сохранить
+          SizedBox(
+            width: double.infinity, height: 54,
+            child: ElevatedButton(
+              onPressed: (_saving || _balanceOverLimit) ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _color,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                disabledBackgroundColor: _color.withAlpha(120),
+              ),
+              child: _saving
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(
+                      _isEdit
+                          ? (lang == 'ru' ? 'Сохранить' : lang == 'uz' ? 'Saqlash' : 'Save')
+                          : store.t('add_account'),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+            ),
+          ),
         ]),
       ),
     );
   }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    bool isError = false,
+    void Function(String)? onChanged,
+  }) {
+    final borderColor = isError ? const Color(0xFFef4444) : const Color(0xFFe5e7eb);
+    final focusColor = isError ? const Color(0xFFef4444) : _color;
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Color(0xFFb0b7c3), fontSize: 14),
+        prefixIcon: Icon(icon, size: 18, color: const Color(0xFF9ca3af)),
+        filled: true,
+        fillColor: const Color(0xFFF9FAFB),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: focusColor, width: 1.5)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      ),
+    );
+  }
+}
+
+// ─── Превью карточки в шите ──────────────────────────────────────────────────
+
+class _CardPreview extends StatelessWidget {
+  final String name;
+  final String icon;
+  final Color color;
+  final String currency;
+  final double balance;
+  const _CardPreview({required this.name, required this.icon, required this.color, required this.currency, required this.balance});
+
+  @override
+  Widget build(BuildContext context) {
+    final iconData = _accountIcons[icon] ?? Icons.credit_card;
+    final colorDark = HSLColor.fromColor(color).withLightness(
+      (HSLColor.fromColor(color).lightness - 0.12).clamp(0.0, 1.0)
+    ).toColor();
+
+    return Container(
+      height: 118,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [color, colorDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [BoxShadow(color: color.withAlpha(110), blurRadius: 18, offset: const Offset(0, 7))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Stack(children: [
+          Positioned(right: -12, bottom: -12, child: Icon(iconData, size: 105, color: Colors.white.withAlpha(30))),
+          Positioned(right: -20, top: -20,
+            child: Container(width: 100, height: 100, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withAlpha(15)))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Row(children: [
+                Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white.withAlpha(50), borderRadius: BorderRadius.circular(10)),
+                  child: Icon(iconData, color: Colors.white, size: 18)),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(name.isEmpty ? '···' : name,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+              ]),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        balance == 0 ? '0' : formatAmount(balance),
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                        maxLines: 1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(currency, style: TextStyle(fontSize: 13, color: Colors.white.withAlpha(180))),
+                ],
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  const _SectionLabel({required this.label});
+  @override
+  Widget build(BuildContext context) =>
+      Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF6b7280)));
 }
 
 class _AccountDetail extends StatefulWidget {
@@ -215,15 +801,36 @@ class _AccountDetailState extends State<_AccountDetail> {
                 decoration: BoxDecoration(gradient: LinearGradient(colors: [color.withAlpha(238), color.withAlpha(153)]), borderRadius: BorderRadius.circular(16)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.white.withAlpha(51), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.credit_card, color: Colors.white, size: 16)),
+                    Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.white.withAlpha(51), borderRadius: BorderRadius.circular(8)),
+                      child: Icon(_accountIcons[widget.account.icon] ?? Icons.credit_card, color: Colors.white, size: 16)),
                     const SizedBox(width: 8),
-                    Text(widget.account.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                    Flexible(
+                      child: Text(widget.account.name,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ),
                   ]),
                   const SizedBox(height: 12),
-                  RichText(text: TextSpan(children: [
-                    TextSpan(text: formatAmount(widget.account.balance), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-                    TextSpan(text: ' ${widget.account.currency}', style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(179))),
-                  ])),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            formatAmount(widget.account.balance),
+                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                            maxLines: 1,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(' ${widget.account.currency}',
+                          style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(179))),
+                    ],
+                  ),
                   const SizedBox(height: 12),
                   Row(children: [
                     Expanded(child: Container(

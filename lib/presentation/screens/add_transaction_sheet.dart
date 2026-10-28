@@ -1,6 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../data/app_store.dart';
+
+// Максимально допустимая сумма — 10 триллионов
+const double _kMaxAmount = 10000000000000;
+
+/// Formatter: разрешает только цифры и одну точку, блокирует ввод если
+/// результирующее число превышает [_kMaxAmount].
+class _AmountInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final text = newValue.text;
+    // Разрешаем только цифры и точку
+    if (!RegExp(r'^[\d.]*$').hasMatch(text)) return oldValue;
+    // Не более одной точки
+    if (text.split('.').length > 2) return oldValue;
+    // Проверяем лимит
+    final val = double.tryParse(text);
+    if (val != null && val > _kMaxAmount) return oldValue;
+    return newValue;
+  }
+}
 
 class AddTransactionSheet extends StatefulWidget {
   final String initialType;
@@ -10,12 +31,13 @@ class AddTransactionSheet extends StatefulWidget {
 
 class _AddTransactionSheetState extends State<AddTransactionSheet> {
   late String _type;
-  String _amount = '';
+  final _amountCtrl = TextEditingController();
   String _currency = 'UZS';
   String _category = '';
   String _description = '';
   String? _accountId;
   bool _saving = false;
+  bool _amountOverLimit = false;
 
   @override
   void initState() {
@@ -26,13 +48,25 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
     if (store.categories.isEmpty) store.fetchCategories();
   }
 
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onAmountChanged(String v) {
+    final val = double.tryParse(v.replaceAll(' ', ''));
+    setState(() => _amountOverLimit = val != null && val > _kMaxAmount);
+  }
+
   Future<void> _submit() async {
-    if (_amount.isEmpty || _accountId == null) return;
+    final amount = double.tryParse(_amountCtrl.text) ?? 0;
+    if (_amountCtrl.text.isEmpty || _accountId == null || amount <= 0 || _amountOverLimit) return;
     setState(() => _saving = true);
     await context.read<AppStore>().addTransaction({
       'accountId': _accountId,
       'type': _type,
-      'amount': double.tryParse(_amount) ?? 0,
+      'amount': amount,
       'currency': _currency,
       'category': _category,
       'description': _description,
@@ -44,6 +78,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   @override
   Widget build(BuildContext context) {
     final store = context.watch<AppStore>();
+    final lang = store.lang;
     final filteredCats = store.categories.where((c) => c.type == _type || c.type == 'both').toList();
     if (filteredCats.isNotEmpty && (_category.isEmpty || !filteredCats.any((c) => c.icon == _category))) {
       _category = filteredCats.first.icon;
@@ -88,24 +123,56 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
           const SizedBox(height: 16),
 
           // Amount + Currency
-          Row(children: [
-            Expanded(child: TextField(
-              keyboardType: TextInputType.number,
-              onChanged: (v) => _amount = v,
-              decoration: InputDecoration(hintText: store.t('amount'), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFe5e7eb))), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
-            )),
-            const SizedBox(width: 8),
-            ...['UZS', 'USD', 'RUB'].map((c) => Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: GestureDetector(
-                onTap: () => setState(() => _currency = c),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  decoration: BoxDecoration(color: _currency == c ? const Color(0xFF16a34a) : const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8)),
-                  child: Text(c, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _currency == c ? Colors.white : const Color(0xFF4b5563))),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: TextField(
+                controller: _amountCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [_AmountInputFormatter()],
+                onChanged: _onAmountChanged,
+                decoration: InputDecoration(
+                  hintText: store.t('amount'),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: _amountOverLimit ? const Color(0xFFef4444) : const Color(0xFFe5e7eb)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: _amountOverLimit ? const Color(0xFFef4444) : const Color(0xFFe5e7eb)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: _amountOverLimit ? const Color(0xFFef4444) : const Color(0xFF16a34a), width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
-              ),
-            )),
+              )),
+              const SizedBox(width: 8),
+              ...['UZS', 'USD', 'RUB'].map((c) => Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: GestureDetector(
+                  onTap: () => setState(() => _currency = c),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    decoration: BoxDecoration(color: _currency == c ? const Color(0xFF16a34a) : const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8)),
+                    child: Text(c, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _currency == c ? Colors.white : const Color(0xFF4b5563))),
+                  ),
+                ),
+              )),
+            ]),
+            if (_amountOverLimit) ...[
+              const SizedBox(height: 4),
+              Row(children: [
+                const Icon(Icons.warning_amber_rounded, size: 13, color: Color(0xFFef4444)),
+                const SizedBox(width: 4),
+                Text(
+                  lang == 'ru' ? 'Максимум 10 триллионов'
+                      : lang == 'uz' ? 'Maksimum 10 trillion'
+                      : 'Maximum 10 trillion',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFFef4444)),
+                ),
+              ]),
+            ],
           ]),
           const SizedBox(height: 16),
 
@@ -150,7 +217,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _saving || _amount.isEmpty || _accountId == null ? null : _submit,
+              onPressed: _saving || _amountCtrl.text.isEmpty || _accountId == null || _amountOverLimit ? null : _submit,
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16a34a), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), disabledBackgroundColor: const Color(0xFF16a34a).withAlpha(128)),
               child: Text(_saving ? store.t('saving') : store.t('add'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
             ),

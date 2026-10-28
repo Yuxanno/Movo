@@ -499,12 +499,47 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> deleteAccount(String id) async {
+    // Optimistic update — удаляем локально сразу, не ждём сервер
+    accounts.removeWhere((a) => a.id == id);
+    notifyListeners();
     try {
       await _api.deleteAccount(id);
-      accounts.removeWhere((a) => a.id == id);
-      notifyListeners();
     } catch (e) {
       debugPrint('deleteAccount error: $e');
+      // При ошибке перезагружаем список с сервера чтобы восстановить состояние
+      await fetchAccounts();
+      AppSnackBar.error(message: AppSnackBar.messageFromError(e));
+    }
+  }
+
+  Future<void> updateAccount(String id, Map<String, dynamic> data) async {
+    // Optimistic update — применяем изменения локально сразу
+    final idx = accounts.indexWhere((a) => a.id == id);
+    AccountModel? backup;
+    if (idx != -1) {
+      backup = accounts[idx];
+      accounts[idx] = AccountModel(
+        id: id,
+        name: data['name'] ?? backup.name,
+        icon: data['icon'] ?? backup.icon,
+        color: data['color'] ?? backup.color,
+        balance: (data['balance'] ?? backup.balance).toDouble(),
+        currency: data['currency'] ?? backup.currency,
+        isShared: data['isShared'] ?? backup.isShared,
+      );
+      notifyListeners();
+    }
+    try {
+      final updated = await _api.updateAccount(id, data);
+      if (idx != -1) accounts[idx] = updated;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('updateAccount error: $e');
+      // Откатываем при ошибке
+      if (idx != -1 && backup != null) {
+        accounts[idx] = backup;
+        notifyListeners();
+      }
       AppSnackBar.error(message: AppSnackBar.messageFromError(e));
     }
   }
