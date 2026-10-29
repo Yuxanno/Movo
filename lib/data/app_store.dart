@@ -26,6 +26,11 @@ class AppStore extends ChangeNotifier {
   static const _keyToken = 'movo_token'; // JWT хранится отдельно от данных пользователя
   static const _keyLang  = 'lang';
   static const _keyBiometrics = 'movo_biometrics_enabled';
+  static const _keyCurrency = 'movo_system_currency';
+
+  // ── Системная валюта ─────────────────────────────────────────────────
+  String _systemCurrency = 'UZS';
+  String get systemCurrency => _systemCurrency;
 
   // ── PIN ───────────────────────────────────────────────────────────────
   bool _pinEnabled = false;
@@ -83,6 +88,7 @@ class AppStore extends ChangeNotifier {
       'history_tab': 'История', 'receipt_tab': 'Чек', '30_days': '30 дней', 'shared': 'Совместный', 'balance': 'Баланс',
       'no_data': 'Нет данных', 'not_enough_data': 'Недостаточно данных', 'dashboard': 'Главная',
       'hi': 'Привет', 'month': 'за месяц',
+      'system_currency': 'Валюта системы',
     },
     'en': {
       'settings': 'Settings', 'language': 'Language', 'accounts': 'Accounts', 'operations': 'Operations',
@@ -128,6 +134,7 @@ class AppStore extends ChangeNotifier {
       'history_tab': 'History', 'receipt_tab': 'Receipt', '30_days': '30 days', 'shared': 'Shared', 'balance': 'Balance',
       'no_data': 'No data', 'not_enough_data': 'Not enough data', 'dashboard': 'Dashboard',
       'hi': 'Hi', 'month': 'this month',
+      'system_currency': 'System currency',
     },
     'uz': {
       'settings': 'Sozlamalar', 'language': 'Til', 'accounts': 'Hisoblar', 'operations': 'Operatsiyalar',
@@ -173,6 +180,7 @@ class AppStore extends ChangeNotifier {
       'history_tab': 'Tarix', 'receipt_tab': 'Chek', '30_days': '30 kun', 'shared': 'Birgalikda', 'balance': 'Balans',
       'no_data': 'Ma\'lumot yo\'q', 'not_enough_data': 'Ma\'lumot yetarli emas', 'dashboard': 'Asosiy',
       'hi': 'Salom', 'month': 'oy uchun',
+      'system_currency': 'Tizim valyutasi',
     }
   };
 
@@ -203,6 +211,26 @@ class AppStore extends ChangeNotifier {
   Future<void> _clearToken() async {
     await SecureStorageService.deleteToken();
     _api.setToken(null);
+  }
+
+  // ── Системная валюта ─────────────────────────────────────────────────
+
+  Future<void> loadSystemCurrency() async {
+    final prefs = await SharedPreferences.getInstance();
+    _systemCurrency = prefs.getString(_keyCurrency) ?? 'UZS';
+    notifyListeners();
+  }
+
+  Future<void> setSystemCurrency(String currency) async {
+    _systemCurrency = currency;
+    // Обновляем валюту у всех счетов локально (для отображения в UI)
+    accounts = accounts.map((a) => AccountModel(
+      id: a.id, name: a.name, icon: a.icon, color: a.color,
+      balance: a.balance, currency: currency, isShared: a.isShared,
+    )).toList();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyCurrency, currency);
   }
 
   // ── Язык ──────────────────────────────────────────────────────────────

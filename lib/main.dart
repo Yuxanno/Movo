@@ -54,6 +54,7 @@ class MovoApp extends StatelessWidget {
           Future.microtask(() {
             store.loadBiometrics();
             store.loadPinStatus();
+            store.loadSystemCurrency();
             store.fetchAccounts();
             store.fetchTransactions();
             store.fetchCategories();
@@ -61,6 +62,9 @@ class MovoApp extends StatelessWidget {
             // Синхронизируем настройки с MongoDB при каждом запуске
             store.syncSettingsFromServer();
           });
+        } else {
+          // Даже без авторизации загружаем валюту
+          Future.microtask(() => store.loadSystemCurrency());
         }
         return store;
       },

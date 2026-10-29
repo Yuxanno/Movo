@@ -144,7 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      formatCurrency(store.totalBalance),
+                      formatCurrency(store.totalBalance, store.systemCurrency),
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w900,
@@ -257,8 +257,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
               const SizedBox(height: 4),
               Row(children: [
-                Text(formatAmount(store.monthlyIncome),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+                Flexible(child: Text(formatAmountWithCurrency(store.monthlyIncome, store.systemCurrency),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937)),
+                    overflow: TextOverflow.ellipsis)),
                 const SizedBox(width: 8),
                 SizedBox(
                   width: 60, height: 24,
@@ -273,8 +274,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
               const SizedBox(height: 4),
               Row(children: [
-                Text(formatAmount(store.monthlyExpense),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+                Flexible(child: Text(formatAmountWithCurrency(store.monthlyExpense, store.systemCurrency),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937)),
+                    overflow: TextOverflow.ellipsis)),
                 const SizedBox(width: 8),
                 SizedBox(
                   width: 60, height: 24,
@@ -479,7 +481,7 @@ class _BankCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(color: Colors.white.withAlpha(30), borderRadius: BorderRadius.circular(6)),
-                      child: Text(account.currency,
+                      child: Text(store.systemCurrency,
                           style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white.withAlpha(210))),
                     ),
                   ])),
@@ -498,15 +500,15 @@ class _BankCard extends StatelessWidget {
                           maxLines: 1),
                     )),
                     const SizedBox(width: 6),
-                    Text(account.currency,
+                    Text(store.systemCurrency,
                         style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(180), fontWeight: FontWeight.w500)),
                   ]),
                 ]),
                 // Доходы / расходы
                 Row(children: [
-                  Expanded(child: _CardStat(icon: Icons.trending_up, label: store.t('income'), value: formatAmount(income))),
+                  Expanded(child: _CardStat(icon: Icons.trending_up, label: store.t('income'), value: formatAmountWithCurrency(income, store.systemCurrency))),
                   const SizedBox(width: 8),
-                  Expanded(child: _CardStat(icon: Icons.trending_down, label: store.t('expense'), value: formatAmount(expense))),
+                  Expanded(child: _CardStat(icon: Icons.trending_down, label: store.t('expense'), value: formatAmountWithCurrency(expense, store.systemCurrency))),
                 ]),
               ],
             ),
@@ -574,7 +576,7 @@ class _TxRow extends StatelessWidget {
         ])),
         const SizedBox(width: 8),
         Text(
-          '${isIncome ? "+" : "−"}${formatAmount(tx.amount)}',
+          '${isIncome ? "+" : "−"}${formatAmountWithCurrency(tx.amount, store.systemCurrency)}',
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color),
         ),
       ]),

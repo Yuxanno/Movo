@@ -7,7 +7,7 @@ import '../../data/models/account_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../core/utils/helpers.dart';
 
-const _currencies = ['UZS', 'USD', 'RUB'];
+// Валюта счёта всегда берётся из store.systemCurrency
 
 // Максимально допустимая сумма — 10 триллионов
 const double _kMaxAmount = 10000000000000;
@@ -202,6 +202,7 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final store = context.watch<AppStore>();
     final color = parseColor(account.color);
     final iconData = _accountIcons[account.icon] ?? Icons.credit_card;
     // Светлый или тёмный акцент для второго градиента
@@ -279,7 +280,7 @@ class _AccountCard extends StatelessWidget {
                                   color: Colors.white.withAlpha(35),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Text(account.currency,
+                                child: Text(store.systemCurrency,
                                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withAlpha(220))),
                               ),
                             ]),
@@ -345,7 +346,7 @@ class _AccountCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              account.currency,
+                              store.systemCurrency,
                               style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(180), fontWeight: FontWeight.w500),
                             ),
                           ],
@@ -390,7 +391,7 @@ class _AccountSheetState extends State<_AccountSheet> {
     final e = widget.existing;
     _nameCtrl = TextEditingController(text: e?.name ?? '');
     _balanceCtrl = TextEditingController(text: e == null ? '' : (e.balance == 0 ? '' : e.balance.toStringAsFixed(0)));
-    _currency = e?.currency ?? 'UZS';
+    _currency = e?.currency ?? 'UZS'; // будет перезаписан в build из systemCurrency
     _icon = e?.icon ?? 'card';
     _color = e != null ? parseColor(e.color) : const Color(0xFF22c55e);
   }
@@ -406,12 +407,13 @@ class _AccountSheetState extends State<_AccountSheet> {
     if (_nameCtrl.text.trim().isEmpty || _balanceOverLimit) return;
     setState(() => _saving = true);
     final balance = double.tryParse(_balanceCtrl.text.replaceAll(' ', '')) ?? 0;
+    final currency = context.read<AppStore>().systemCurrency;
     await widget.onSave({
       'name': _nameCtrl.text.trim(),
       'icon': _icon,
       'color': _colorToHex(_color),
       'balance': balance,
-      'currency': _currency,
+      'currency': currency,
       'isShared': false,
     });
     if (mounted) Navigator.pop(context);
@@ -448,7 +450,7 @@ class _AccountSheetState extends State<_AccountSheet> {
           const SizedBox(height: 16),
 
           // Превью карточки
-          _CardPreview(name: _nameCtrl.text, icon: _icon, color: _color, currency: _currency,
+          _CardPreview(name: _nameCtrl.text, icon: _icon, color: _color, currency: store.systemCurrency,
               balance: double.tryParse(_balanceCtrl.text.replaceAll(' ', '')) ?? 0),
           const SizedBox(height: 22),
 
@@ -495,28 +497,34 @@ class _AccountSheetState extends State<_AccountSheet> {
           ]),
           const SizedBox(height: 20),
 
-          // Валюта
+          // Валюта (информационный чип)
           _SectionLabel(label: store.t('currency_label')),
           const SizedBox(height: 8),
-          Row(children: _currencies.map((c) => Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () => setState(() => _currency = c),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-                decoration: BoxDecoration(
-                  color: _currency == c ? _color : const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: _currency == c ? [BoxShadow(color: _color.withAlpha(70), blurRadius: 8, offset: const Offset(0, 3))] : [],
-                ),
-                child: Text(c, style: TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w600,
-                  color: _currency == c ? Colors.white : const Color(0xFF6b7280),
-                )),
-              ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: _color.withAlpha(20),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _color.withAlpha(60)),
             ),
-          )).toList()),
+            child: Row(children: [
+              Icon(Icons.info_outline, size: 16, color: _color),
+              const SizedBox(width: 8),
+              Text(
+                store.systemCurrency,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _color),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  lang == 'ru' ? '— системная валюта (изменяется в Настройках)'
+                      : lang == 'uz' ? "— tizim valyutasi (Sozlamalarda o'zgartiriladi)"
+                      : '— system currency (change in Settings)',
+                  style: TextStyle(fontSize: 11, color: _color.withAlpha(180)),
+                ),
+              ),
+            ]),
+          ),
           const SizedBox(height: 20),
 
           // Иконка
@@ -827,7 +835,7 @@ class _AccountDetailState extends State<_AccountDetail> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      Text(' ${widget.account.currency}',
+                      Text(' ${store.systemCurrency}',
                           style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(179))),
                     ],
                   ),
@@ -838,7 +846,7 @@ class _AccountDetailState extends State<_AccountDetail> {
                       decoration: BoxDecoration(color: Colors.white.withAlpha(38), borderRadius: BorderRadius.circular(12)),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(store.t('income'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
-                        Text('+${formatAmount(income)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                        Text('+${formatAmountWithCurrency(income, store.systemCurrency)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
                       ]),
                     )),
                     const SizedBox(width: 12),
@@ -847,7 +855,7 @@ class _AccountDetailState extends State<_AccountDetail> {
                       decoration: BoxDecoration(color: Colors.white.withAlpha(38), borderRadius: BorderRadius.circular(12)),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(store.t('expense'), style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(179))),
-                        Text('−${formatAmount(expense)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                        Text('−${formatAmountWithCurrency(expense, store.systemCurrency)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
                       ]),
                     )),
                   ]),
@@ -890,7 +898,7 @@ class _AccountDetailState extends State<_AccountDetail> {
                         Text(t.description.isNotEmpty ? t.description : t.category, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1f2937))),
                         Text('${formatDate(t.date)} · ${t.category}', style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
                       ])),
-                      Text('${isIncome ? "+" : "−"}${formatAmount(t.amount)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: txColor)),
+                      Text('${isIncome ? "+" : "−"}${formatAmountWithCurrency(t.amount, store.systemCurrency)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: txColor)),
                     ]),
                   );
                 }),

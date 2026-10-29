@@ -71,6 +71,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final store = context.read<AppStore>();
         store.setUser(data['_id'] as String, name: data['name'] as String?, login: data['login'] as String?);
         await store.saveUserToPrefs(data);
+        // Устанавливаем системную валюту из выбора пользователя
+        await store.setSystemCurrency(_currency);
         // Сохраняем JWT — все последующие запросы пойдут с Authorization: Bearer
         final token = data['token'] as String?;
         if (token != null && token.isNotEmpty) await store.saveToken(token);
@@ -256,24 +258,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
             action: TextInputAction.done,
             onSubmitted: (_) => _handleNext(),
           ),
-          const SizedBox(height: 14),
-          Row(children: ['UZS', 'USD', 'RUB'].map((c) => Expanded(child: Padding(
-            padding: EdgeInsets.only(right: c != 'RUB' ? 8 : 0),
-            child: GestureDetector(
-              onTap: () => setState(() => _currency = c),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: _currency == c ? const Color(0xFF16a34a) : const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: _currency == c ? [BoxShadow(color: const Color(0xFF16a34a).withAlpha(51), blurRadius: 8)] : null,
+          const SizedBox(height: 16),
+          // Выбор валюты — станет системной
+          Row(children: [
+            for (final item in [
+              {'code': 'UZS', 'flag': '🇺🇿'},
+              {'code': 'USD', 'flag': '🇺🇸'},
+              {'code': 'RUB', 'flag': '🇷🇺'},
+            ]) ...[
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    right: item['code'] != 'RUB' ? 8 : 0,
+                  ),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _currency = item['code']!),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: _currency == item['code']
+                            ? const Color(0xFF16a34a)
+                            : const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: _currency == item['code']
+                            ? [BoxShadow(
+                                color: const Color(0xFF16a34a).withAlpha(51),
+                                blurRadius: 8,
+                              )]
+                            : null,
+                      ),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        Text(item['flag']!, style: const TextStyle(fontSize: 18)),
+                        const SizedBox(height: 4),
+                        Text(
+                          item['code']!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: _currency == item['code']
+                                ? Colors.white
+                                : const Color(0xFF6b7280),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
                 ),
-                child: Text(c, textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
-                    color: _currency == c ? Colors.white : const Color(0xFF6b7280))),
               ),
-            ),
-          ))).toList()),
+            ],
+          ]),
         ],
 
         if (_step == 3) ...[

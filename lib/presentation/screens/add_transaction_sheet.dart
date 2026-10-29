@@ -32,7 +32,6 @@ class AddTransactionSheet extends StatefulWidget {
 class _AddTransactionSheetState extends State<AddTransactionSheet> {
   late String _type;
   final _amountCtrl = TextEditingController();
-  String _currency = 'UZS';
   String _category = '';
   String _description = '';
   String? _accountId;
@@ -63,11 +62,12 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
     final amount = double.tryParse(_amountCtrl.text) ?? 0;
     if (_amountCtrl.text.isEmpty || _accountId == null || amount <= 0 || _amountOverLimit) return;
     setState(() => _saving = true);
+    final currency = context.read<AppStore>().systemCurrency;
     await context.read<AppStore>().addTransaction({
       'accountId': _accountId,
       'type': _type,
       'amount': amount,
-      'currency': _currency,
+      'currency': currency,
       'category': _category,
       'description': _description,
       'date': DateTime.now().toIso8601String(),
@@ -122,44 +122,32 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
           ),
           const SizedBox(height: 16),
 
-          // Amount + Currency
+          // Amount
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(child: TextField(
-                controller: _amountCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [_AmountInputFormatter()],
-                onChanged: _onAmountChanged,
-                decoration: InputDecoration(
-                  hintText: store.t('amount'),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: _amountOverLimit ? const Color(0xFFef4444) : const Color(0xFFe5e7eb)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: _amountOverLimit ? const Color(0xFFef4444) : const Color(0xFFe5e7eb)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: _amountOverLimit ? const Color(0xFFef4444) : const Color(0xFF16a34a), width: 1.5),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            TextField(
+              controller: _amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [_AmountInputFormatter()],
+              onChanged: _onAmountChanged,
+              decoration: InputDecoration(
+                hintText: store.t('amount'),
+                suffixText: store.systemCurrency,
+                suffixStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF16a34a)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: _amountOverLimit ? const Color(0xFFef4444) : const Color(0xFFe5e7eb)),
                 ),
-              )),
-              const SizedBox(width: 8),
-              ...['UZS', 'USD', 'RUB'].map((c) => Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: GestureDetector(
-                  onTap: () => setState(() => _currency = c),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    decoration: BoxDecoration(color: _currency == c ? const Color(0xFF16a34a) : const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8)),
-                    child: Text(c, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _currency == c ? Colors.white : const Color(0xFF4b5563))),
-                  ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: _amountOverLimit ? const Color(0xFFef4444) : const Color(0xFFe5e7eb)),
                 ),
-              )),
-            ]),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: _amountOverLimit ? const Color(0xFFef4444) : const Color(0xFF16a34a), width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
             if (_amountOverLimit) ...[
               const SizedBox(height: 4),
               Row(children: [

@@ -26,6 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     store.loadPinStatus();
     store.loadBiometrics();
     store.loadLanguage();
+    store.loadSystemCurrency();
   }
 
   void _showLanguageDialog() {
@@ -48,10 +49,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _showCurrencyDialog() {
+    final store = context.read<AppStore>();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => ChangeNotifierProvider.value(
+        value: store,
+        child: Consumer<AppStore>(
+          builder: (ctx, s, _) => Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFe5e7eb), borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 16),
+              Text(s.t('system_currency'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1f2937))),
+              const SizedBox(height: 4),
+              Text(
+                s.lang == 'ru' ? 'Все суммы в приложении будут отображаться в этой валюте'
+                    : s.lang == 'uz' ? 'Barcha summalar ushbu valyutada ko\'rsatiladi'
+                    : 'All amounts in the app will use this currency',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af)),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              for (final c in [
+                {'code': 'UZS', 'name': 'Сўм', 'flag': '🇺🇿', 'sub': 'Uzbek som'},
+                {'code': 'USD', 'name': 'Dollar', 'flag': '🇺🇸', 'sub': 'US Dollar'},
+                {'code': 'RUB', 'name': 'Рубль', 'flag': '🇷🇺', 'sub': 'Russian ruble'},
+              ]) ...[
+                _CurrencyItem(
+                  code: c['code']!,
+                  name: c['name']!,
+                  flag: c['flag']!,
+                  sub: c['sub']!,
+                  current: s.systemCurrency,
+                  onTap: (code) {
+                    s.setSystemCurrency(code);
+                    Navigator.pop(ctx);
+                  },
+                ),
+              ],
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = context.watch<AppStore>();
     final flag = store.lang == 'ru' ? '🇷🇺' : (store.lang == 'en' ? '🇺🇸' : '🇺🇿');
+    final currencyFlag = store.systemCurrency == 'UZS' ? '🇺🇿' : (store.systemCurrency == 'USD' ? '🇺🇸' : '🇷🇺');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F7F4),
@@ -99,6 +149,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => ChangeNotifierProvider.value(value: context.read<AppStore>(), child: const CategoriesScreen())));
                 }),
                 _SettingRow(icon: Icons.language, label: store.t('language'), trailing: flag, onTap: _showLanguageDialog),
+                _SettingRow(
+                  icon: Icons.currency_exchange,
+                  label: store.t('system_currency'),
+                  trailing: '$currencyFlag ${store.systemCurrency}',
+                  onTap: _showCurrencyDialog,
+                ),
                 
                 // PIN-переключатель — состояние хранится в AppStore.pinEnabled,
                 // загружается при каждом появлении экрана через _reload()
@@ -273,6 +329,54 @@ class _SettingRow extends StatelessWidget {
             const SizedBox(width: 4),
             const Icon(Icons.chevron_right, size: 18, color: Color(0xFFd1d5db)),
           ]),
+        ]),
+      ),
+    );
+  }
+}
+
+class _CurrencyItem extends StatelessWidget {
+  final String code;
+  final String name;
+  final String flag;
+  final String sub;
+  final String current;
+  final Function(String) onTap;
+  const _CurrencyItem({required this.code, required this.name, required this.flag, required this.sub, required this.current, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final bool active = current == code;
+    return InkWell(
+      onTap: () => onTap(code),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFFDCFCE7) : const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: active ? const Color(0xFF16a34a) : const Color(0xFFe5e7eb),
+            width: active ? 1.5 : 1,
+          ),
+        ),
+        child: Row(children: [
+          Text(flag, style: const TextStyle(fontSize: 26)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
+              color: active ? const Color(0xFF16a34a) : const Color(0xFF1f2937))),
+            Text(sub, style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
+          ])),
+          Text(code, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
+            color: active ? const Color(0xFF16a34a) : const Color(0xFF6b7280))),
+          const SizedBox(width: 8),
+          if (active)
+            const Icon(Icons.check_circle, color: Color(0xFF16a34a), size: 20)
+          else
+            const SizedBox(width: 20),
         ]),
       ),
     );

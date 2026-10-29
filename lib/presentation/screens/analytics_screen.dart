@@ -125,7 +125,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text('${balance >= 0 ? "+" : ""}${formatAmount(balance)}',
+                  child: Text('${balance >= 0 ? "+" : ""}${formatAmountWithCurrency(balance, store.systemCurrency)}',
                       style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
                 const SizedBox(height: 12),
@@ -141,7 +141,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
-                          child: Text(formatAmount(totalIncome),
+                          child: Text(formatAmountWithCurrency(totalIncome, store.systemCurrency),
                               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                         ),
                       ])),
@@ -159,7 +159,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
-                          child: Text(formatAmount(totalExpense),
+                          child: Text(formatAmountWithCurrency(totalExpense, store.systemCurrency),
                               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                         ),
                       ])),

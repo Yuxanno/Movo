@@ -11,6 +11,11 @@ String formatAmount(double amount) {
   return f.format(amount.toInt());
 }
 
+/// Форматирует сумму с символом валюты: "20 000 сум", "1 234 $", "500 ₽"
+String formatAmountWithCurrency(double amount, String currency) {
+  return formatCurrency(amount, currency);
+}
+
 String _currencyLabel(String c) {
   switch (c) {
     case 'UZS': return 'сум';

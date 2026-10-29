@@ -230,7 +230,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                     style: const TextStyle(fontSize: 12, color: Color(0xFF9ca3af))),
                 ])),
                 const SizedBox(width: 8),
-                Text('${isIncome ? "+" : "−"}${formatAmount(tx.amount)}',
+                Text('${isIncome ? "+" : "−"}${formatAmountWithCurrency(tx.amount, store.systemCurrency)}',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isIncome ? const Color(0xFF16a34a) : const Color(0xFFef4444))),
                 const SizedBox(width: 6),
                 GestureDetector(
