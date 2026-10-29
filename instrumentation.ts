@@ -7,5 +7,8 @@ export async function register() {
     } catch (err) {
       console.error('❌ MongoDB connection FAILED:', err)
     }
+
+    const { startKeepAlive } = await import('./lib/keepAlive')
+    startKeepAlive()
   }
 }
