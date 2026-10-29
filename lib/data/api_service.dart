@@ -17,7 +17,7 @@ class ApiService {
   //   flutter build apk --dart-define=API_BASE_URL=http://91.108.122.163:3000/api
   static const String _baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3000/api',
+    defaultValue: 'https://movo-oanc.onrender.com/api',
   );
 
   // Таймаут в миллисекундах тоже можно переопределить при сборке:
