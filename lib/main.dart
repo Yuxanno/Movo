@@ -249,14 +249,16 @@ class _AppShellWithLifecycleState extends State<AppShellWithLifecycle> with Widg
   bool _locked = false;
   bool _showingPin = false;
   final _adService = AdService();
+  // Счётчик возвращений в приложение — показываем рекламу не при каждом resume
+  int _resumeCount = 0;
+  static const _adEveryNResumes = 3; // каждые 3 возврата
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Загружаем состояние биометрии
     Future.microtask(() => context.read<AppStore>().loadBiometrics());
-    // Загружаем рекламу и показываем через 5 секунд (только на мобильных)
+    // Загружаем рекламу заранее, показываем через 5с после старта (только мобайл)
     if (!kIsWeb) {
       _adService.load().then((_) {
         Future.delayed(const Duration(seconds: 5), () {
@@ -275,50 +277,53 @@ class _AppShellWithLifecycleState extends State<AppShellWithLifecycle> with Widg
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
-    print('AppLifecycleState: $state');
     if (state == AppLifecycleState.paused) {
-      // БЫЛО: prefs.getString('pin_code') != null
-      // СТАЛО: SecureStorageService.getPin() != null
       final pin = await SecureStorageService.getPin();
-      print('Pin exists: ${pin != null}');
       if (pin != null) _locked = true;
-      print('Set _locked to: $_locked');
-    } else if (state == AppLifecycleState.resumed && _locked && !_showingPin) {
-      print('Resuming app: _locked=$_locked, _showingPin=$_showingPin');
-      _locked = false;
-      final pin = await SecureStorageService.getPin();
-      if (pin == null) {
-        print('No pin set, skip lock');
-        return;
-      }
-      final store = context.read<AppStore>();
-      print('Biometrics enabled: ${store.biometricsEnabled}');
 
-      // Сначала попробуем биометрию, если она включена
-      if (store.biometricsEnabled) {
-        final authenticated = await store.authenticateWithBiometrics(
-          reason: 'Разблокируйте приложение',
-        );
-        print('Biometrics authenticated: $authenticated');
-        if (authenticated) return;
+    } else if (state == AppLifecycleState.resumed) {
+      // ── PIN-блокировка ──────────────────────────────────────────────
+      if (_locked && !_showingPin) {
+        _locked = false;
+        final pin = await SecureStorageService.getPin();
+        if (pin != null) {
+          final store = context.read<AppStore>();
+          if (store.biometricsEnabled) {
+            final authenticated = await store.authenticateWithBiometrics(
+              reason: 'Разблокируйте приложение',
+            );
+            if (authenticated) {
+              // После разблокировки — показываем рекламу
+              _tryShowAdOnResume();
+              return;
+            }
+          }
+          _showingPin = true;
+          await navigatorKey.currentState!.push(MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => WillPopScope(
+              onWillPop: () async => false,
+              child: PinScreen(
+                onSuccess: () {
+                  _showingPin = false;
+                  navigatorKey.currentState!.pop();
+                },
+              ),
+            ),
+          ));
+          _showingPin = false;
+        }
       }
 
-      // Если биометрия не сработала или отключена — запрашиваем PIN
-      print('Showing PIN screen');
-      _showingPin = true;
-      await navigatorKey.currentState!.push(MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => WillPopScope(
-          onWillPop: () async => false, // Cannot pop back
-          child: PinScreen(
-            onSuccess: () {
-              _showingPin = false;
-              navigatorKey.currentState!.pop();
-            },
-          ),
-        ),
-      ));
-      _showingPin = false;
+      // ── Реклама при возврате ────────────────────────────────────────
+      if (!kIsWeb) _tryShowAdOnResume();
+    }
+  }
+
+  void _tryShowAdOnResume() {
+    _resumeCount++;
+    if (_resumeCount % _adEveryNResumes == 0) {
+      _adService.show();
     }
   }
 

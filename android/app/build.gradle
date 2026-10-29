@@ -2,6 +2,7 @@ plugins {
     id "com.android.application"
     id "org.jetbrains.kotlin.android"
     id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
 }
 
 def localProperties = new Properties()
@@ -22,6 +23,15 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// Signing config from key.properties
+def keyPropertiesFile = rootProject.file('key.properties')
+def keyProperties = new Properties()
+if (keyPropertiesFile.exists()) {
+    keyPropertiesFile.withReader('UTF-8') { reader ->
+        keyProperties.load(reader)
+    }
+}
+
 android {
     namespace "com.shaloondev.movo"
     compileSdk 36
@@ -40,18 +50,31 @@ android {
         main.java.srcDirs += 'src/main/kotlin'
     }
 
+    signingConfigs {
+        release {
+            if (keyPropertiesFile.exists()) {
+                storeFile file(keyProperties['storeFile'])
+                storePassword keyProperties['storePassword']
+                keyAlias keyProperties['keyAlias']
+                keyPassword keyProperties['keyPassword']
+            }
+        }
+    }
+
     defaultConfig {
         applicationId "com.shaloondev.movo"
 
         minSdkVersion 24
         targetSdkVersion 36
-        versionCode 7
-        versionName "1.0.6"
+        versionCode 8
+        versionName "1.0.7"
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            signingConfig keyPropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
         }
     }
 }
