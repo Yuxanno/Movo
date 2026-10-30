@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/app_store.dart';
 import '../../core/utils/helpers.dart';
+import 'ai_chat_screen.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({Key? key}) : super(key: key);
@@ -197,6 +198,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ),
             const SizedBox(height: 14),
 
+            // ── AI Аналитика ──────────────────────────────────────────────
+            _buildAiCard(store),
+            const SizedBox(height: 14),
+
             // Category breakdown
             Container(
               padding: const EdgeInsets.all(14),
@@ -230,6 +235,78 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ]),
             ),
           ]),
+        ),
+      ),
+    );
+  }
+
+  // ── AI Карточка ──────────────────────────────────────────────────────────
+
+  Widget _buildAiCard(AppStore store) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChangeNotifierProvider.value(
+              value: context.read<AppStore>(),
+              child: const AiChatScreen(),
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF8b5cf6), Color(0xFF6366f1)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: const Color(0xFF8b5cf6).withAlpha(50), blurRadius: 16, offset: const Offset(0, 6))],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(30),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(store.t('ai_advisor'),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                  const SizedBox(height: 3),
+                  Text(store.t('ai_tip'),
+                      style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(200))),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(30),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(store.t('ai_ask'),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

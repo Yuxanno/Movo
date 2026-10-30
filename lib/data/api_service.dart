@@ -210,4 +210,29 @@ class ApiService {
     }
     return data;
   }
+
+  // ── AI Чат ──────────────────────────────────────────────────────────────
+
+  /// Отправляет сообщение в AI-чат. Бэкенд загружает все данные пользователя
+  /// (транзакции, счета, категории) и формирует контекст для ИИ.
+  ///
+  /// [message] — вопрос пользователя.
+  /// [lang] — язык интерфейса ('ru', 'en', 'uz') для ответа ИИ.
+  /// Возвращает { reply: "текст ответа" }.
+  Future<Map<String, dynamic>> sendAiChatMessage(String message, {String? lang}) async {
+    final body = <String, dynamic>{'message': message};
+    if (lang != null) body['lang'] = lang;
+
+    final res = await http.post(
+      Uri.parse('$baseUrl/ai/chat'),
+      headers: _headers,
+      body: jsonEncode(body),
+    ).timeout(const Duration(milliseconds: 60000)); // AI может думать дольше
+
+    final data = _decode(res) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw Exception(data['error'] ?? 'Ошибка AI сервиса');
+    }
+    return data;
+  }
 }

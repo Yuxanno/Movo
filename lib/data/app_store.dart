@@ -89,6 +89,11 @@ class AppStore extends ChangeNotifier {
       'no_data': 'Нет данных', 'not_enough_data': 'Недостаточно данных', 'dashboard': 'Главная',
       'hi': 'Привет', 'month': 'за месяц',
       'system_currency': 'Валюта системы',
+      'ai_advisor': 'AI Финансист', 'ai_tip': 'Совет AI', 'ai_ask': 'Спросить AI',
+      'ai_loading': 'AI думает...', 'ai_send': 'Отправить', 'ai_welcome': 'Привет! Я ваш AI-финансист. Спросите меня, как оптимизировать расходы или что делать с накоплениями.',
+      'ai_suggestion_1': 'Как уменьшить расходы?', 'ai_suggestion_2': 'Где я трачу больше всего?',
+      'ai_suggestion_3': 'Совет на этот месяц', 'ai_hint': 'Спросите о своих финансах...',
+      'ai_error': 'Не удалось получить ответ. Попробуйте позже.',
     },
     'en': {
       'settings': 'Settings', 'language': 'Language', 'accounts': 'Accounts', 'operations': 'Operations',
@@ -135,6 +140,11 @@ class AppStore extends ChangeNotifier {
       'no_data': 'No data', 'not_enough_data': 'Not enough data', 'dashboard': 'Dashboard',
       'hi': 'Hi', 'month': 'this month',
       'system_currency': 'System currency',
+      'ai_advisor': 'AI Advisor', 'ai_tip': 'AI Tip', 'ai_ask': 'Ask AI',
+      'ai_loading': 'AI is thinking...', 'ai_send': 'Send', 'ai_welcome': 'Hi! I\'m your AI financial advisor. Ask me how to optimize spending or what to do with savings.',
+      'ai_suggestion_1': 'How to reduce spending?', 'ai_suggestion_2': 'Where do I spend the most?',
+      'ai_suggestion_3': 'Tip for this month', 'ai_hint': 'Ask about your finances...',
+      'ai_error': 'Could not get a response. Try again later.',
     },
     'uz': {
       'settings': 'Sozlamalar', 'language': 'Til', 'accounts': 'Hisoblar', 'operations': 'Operatsiyalar',
@@ -181,6 +191,11 @@ class AppStore extends ChangeNotifier {
       'no_data': 'Ma\'lumot yo\'q', 'not_enough_data': 'Ma\'lumot yetarli emas', 'dashboard': 'Asosiy',
       'hi': 'Salom', 'month': 'oy uchun',
       'system_currency': 'Tizim valyutasi',
+      'ai_advisor': 'AI Moliyaviy maslahatchi', 'ai_tip': 'AI maslahati', 'ai_ask': 'AI\'ga so\'rash',
+      'ai_loading': 'AI o\'ylayapti...', 'ai_send': 'Yuborish', 'ai_welcome': 'Salom! Men sizning AI moliyaviy maslahatchingizman. Xarajatlarni qanday optimallashtirish yoki jamg\'armalar bilan nima qilish kerakligini so\'rang.',
+      'ai_suggestion_1': 'Xarajatlarni qanday kamaytirish?', 'ai_suggestion_2': 'Qayerda eng ko\'p sarflayman?',
+      'ai_suggestion_3': 'Bu oy uchun maslahat', 'ai_hint': 'Moliyangiz haqida so\'rang...',
+      'ai_error': 'Javob olinmadi. Keyinroq urinib ko\'ring.',
     }
   };
 
@@ -513,6 +528,15 @@ class AppStore extends ChangeNotifier {
       // Тихо логируем, пользователя не беспокоим.
     }
     notifyListeners();
+  }
+
+  // ── AI Чат ───────────────────────────────────────────────────────────
+
+  /// Отправляет сообщение в AI-чат через бэкенд.
+  /// Бэкенд загружает все данные пользователя и формирует контекст для ИИ.
+  /// Возвращает { reply: "..." }.
+  Future<Map<String, dynamic>> sendAiMessage(String message) async {
+    return await _api.sendAiChatMessage(message, lang: lang);
   }
 
   Future<void> addAccount(Map<String, dynamic> data) async {
